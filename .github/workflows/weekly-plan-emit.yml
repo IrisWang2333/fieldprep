@@ -32,6 +32,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Download geospatial data
+        run: |
+          echo "Downloading geospatial data files..."
+          python scripts/download_data.py
+
       - name: Download latest notification activities
         run: |
           echo "Downloading latest pothole data..."

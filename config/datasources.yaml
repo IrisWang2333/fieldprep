@@ -1,7 +1,7 @@
 # Fill either 'url' (so `make fetch` can download) or leave blank and drop the file at 'path'.
 
 streets_segments:
-  path: /Users/iris/Dropbox/SanDiego311/data/raw/DataSD/sd_paving_segs_datasd/sd_paving_segs_datasd.shp
+  path: data/raw/DataSD/sd_paving_segs_datasd/sd_paving_segs_datasd.shp
   url: ""
   crs_input: 2230
 
@@ -21,15 +21,15 @@ gid_all:
   url: ""
 
 council_districts:
-  path: /Users/iris/Dropbox/SanDiego311/data/raw/DataSD/council_districts_datasd/council_districts_datasd.shp
+  path: data/raw/DataSD/council_districts_datasd/council_districts_datasd.shp
   url: "https://webmaps.sandiego.gov/arcgis/rest/services/DSD/Basemap/MapServer/7/query?where=1=1&outFields=*&f=geojson"
 
 parcels:
-  path: /Users/iris/Dropbox/SanDiego311/data/raw/sangis/Parcels_shapefile.zip
+  path: data/raw/DataSD/parcels/parcels.shp
   url: "https://webmaps.sandiego.gov/arcgis/rest/services/DoIT_Public/DoIT_Public/MapServer/4/query?where=1=1&outFields=*&f=geojson"
 
 address_points:
-  path: /Users/iris/Dropbox/SanDiego311/data/raw/DataSD/addrapn_datasd/addrapn_datasd.shp
+  path: data/raw/DataSD/addrapn_datasd/addrapn_datasd.shp
   url: "https://webmaps.sandiego.gov/arcgis/rest/services/GeocoderMerged/MapServer/2/query?where=1=1&outFields=*&f=geojson"
   crs_input: 2230
   id_field: objectid
@@ -39,15 +39,15 @@ projects:
   url: ""
 
 zoning:
-  path: "/Users/iris/Dropbox/SanDiego311/data/raw/DataSD/zoning_datasd/zoning_datasd.shp"
+  path: "data/raw/DataSD/zoning_datasd/zoning_datasd.shp"
   code_field: "ZONE"         # If unknown, leave off; the code will auto-detect common names
   crs_input: 2230
 
 cpd:
-  path: "/Users/iris/Dropbox/SanDiego311/data/raw/DataSD/cmty_plan_datasd/cmty_plan_datasd.shp"
+  path: "data/raw/DataSD/cmty_plan_datasd/cmty_plan_datasd.shp"
   name_field: "COMMUNITY"    # If unknown, leave off; we'll auto-detect
   crs_input: 2230
 
 city_boundary:
-  path: "/Users/iris/Dropbox/SanDiego311/data/raw/DataSD/san_diego_boundary_datasd/san_diego_boundary_datasd.shp"
+  path: "data/raw/DataSD/san_diego_boundary_datasd/san_diego_boundary_datasd.shp"
   crs_input: 2230
