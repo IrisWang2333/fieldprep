@@ -21,8 +21,12 @@ def get_project_root():
     for parent in [current.parent.parent, current.parent.parent.parent]:
         if (parent / 'src').exists() or (parent / '.git').exists():
             return parent
-    # Fallback to hardcoded path for local development
-    return Path("/Users/iris/Dropbox/sandiego code/code/fieldprep")
+    # Fallback to current working directory (works in GitHub Actions)
+    cwd = Path.cwd()
+    if (cwd / 'src').exists() or (cwd / 'utils').exists():
+        return cwd
+    # Last resort: go up from current file location
+    return current.parent.parent
 
 PROJECT_ROOT = get_project_root()
 DATA_DIR = PROJECT_ROOT / "data"
