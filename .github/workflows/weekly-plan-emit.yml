@@ -47,21 +47,31 @@ jobs:
           print(f'Downloaded {len(activities)} pothole records')
           "
 
-      - name: Calculate next Saturday date
+      - name: Calculate this Saturday date
         id: date
         run: |
-          # Calculate the next Saturday (start of next week)
-          NEXT_SATURDAY=$(python -c "
+          # Calculate this coming Saturday (start of this week)
+          # This workflow runs Friday 10pm PST = Saturday ~6am UTC
+          # We want THIS Saturday, not next Saturday
+          THIS_SATURDAY=$(python -c "
           from datetime import datetime, timedelta
           today = datetime.now()
-          days_until_saturday = (5 - today.weekday()) % 7
-          if days_until_saturday == 0:
-              days_until_saturday = 7
-          next_saturday = today + timedelta(days=days_until_saturday)
-          print(next_saturday.strftime('%Y-%m-%d'))
+          # If today is Saturday (workflow runs Sat 6am UTC), use today
+          # If today is Friday (edge case), use tomorrow
+          if today.weekday() == 5:  # Saturday
+              this_saturday = today
+          elif today.weekday() == 4:  # Friday
+              this_saturday = today + timedelta(days=1)
+          else:
+              # Fallback: calculate days to next Saturday
+              days_until_saturday = (5 - today.weekday()) % 7
+              if days_until_saturday == 0:
+                  days_until_saturday = 7
+              this_saturday = today + timedelta(days=days_until_saturday)
+          print(this_saturday.strftime('%Y-%m-%d'))
           ")
-          echo "next_saturday=$NEXT_SATURDAY" >> $GITHUB_OUTPUT
-          echo "Next week starts: $NEXT_SATURDAY"
+          echo "next_saturday=$THIS_SATURDAY" >> $GITHUB_OUTPUT
+          echo "This week starts: $THIS_SATURDAY"
 
       - name: Run plan.py
         id: plan
