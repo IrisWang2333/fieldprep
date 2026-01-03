@@ -87,12 +87,37 @@ def upload_directory_to_drive(
         print(f"Warning: No files found in {local_dir}")
         return []
 
+    # Extract date folder name from local directory path (e.g., "2026-01-03")
+    date_folder_name = local_dir.name
+
     print(f"\n{'='*70}")
     print(f"Uploading to Google Drive")
     print(f"{'='*70}")
     print(f"Local directory: {local_dir}")
-    print(f"Google Drive folder ID: {folder_id}")
-    print(f"Files to upload: {len(files_to_upload)}")
+    print(f"Parent folder ID: {folder_id}")
+    print(f"Creating subfolder: {date_folder_name}")
+
+    # Create a subfolder in Google Drive with the date name
+    subfolder_metadata = {
+        'name': date_folder_name,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [folder_id]
+    }
+
+    try:
+        subfolder = service.files().create(
+            body=subfolder_metadata,
+            fields='id, name, webViewLink'
+        ).execute()
+
+        subfolder_id = subfolder.get('id')
+        print(f"✓ Created subfolder: {subfolder.get('name')}")
+        print(f"  Folder ID: {subfolder_id}")
+        print(f"  Link: {subfolder.get('webViewLink')}")
+        print(f"\nFiles to upload: {len(files_to_upload)}")
+    except Exception as e:
+        print(f"✗ Error creating subfolder: {e}")
+        raise RuntimeError(f"Failed to create subfolder '{date_folder_name}': {e}")
 
     uploaded_ids = []
     failed_files = []
@@ -103,7 +128,7 @@ def upload_directory_to_drive(
 
             file_metadata = {
                 'name': file_path.name,
-                'parents': [folder_id]
+                'parents': [subfolder_id]  # Upload to the date subfolder
             }
 
             media = MediaFileUpload(
