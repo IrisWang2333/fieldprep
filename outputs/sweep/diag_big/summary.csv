@@ -1,0 +1,2 @@
+scenario,addr_buffer_m,sfh_min,n_segments,sum_sfh_addresses,median_seg_len_m,median_addr_density_per_100m,addresses_initial,addresses_after_zoning,addresses_after_cpd,addresses_final,addresses_filtered,zoning_mode,zoning_codes_n,cpd_exclude_n
+b100_m1,100,1,31314,418525,114.24242085255679,7.273488998834557,458153,458153,458153,458153,0,off,2,1

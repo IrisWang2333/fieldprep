@@ -1,0 +1,159 @@
+name: Weekly Plan and Emit
+
+on:
+  schedule:
+    # Runs every Friday at 10:00 PM Pacific Time
+    # PST (Winter): Friday 10:00 PM = Saturday 6:00 AM UTC
+    # PDT (Summer): Friday 10:00 PM = Saturday 5:00 AM UTC
+    # Using 6:00 AM UTC for PST; adjust to 5:00 during PDT if needed
+    - cron: '0 6 * * 6'  # Every Saturday at 6:00 AM UTC
+
+  workflow_dispatch:  # Allow manual triggering for testing
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  plan-and-emit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download latest notification activities
+        run: |
+          echo "Downloading latest pothole data..."
+          python -c "
+          from utils.data_fetcher import fetch_latest_notification_activities
+          activities = fetch_latest_notification_activities(use_local=False, download_if_missing=True)
+          print(f'Downloaded {len(activities)} pothole records')
+          "
+
+      - name: Calculate next Saturday date
+        id: date
+        run: |
+          # Calculate the next Saturday (start of next week)
+          NEXT_SATURDAY=$(python -c "
+          from datetime import datetime, timedelta
+          today = datetime.now()
+          days_until_saturday = (5 - today.weekday()) % 7
+          if days_until_saturday == 0:
+              days_until_saturday = 7
+          next_saturday = today + timedelta(days=days_until_saturday)
+          print(next_saturday.strftime('%Y-%m-%d'))
+          ")
+          echo "next_saturday=$NEXT_SATURDAY" >> $GITHUB_OUTPUT
+          echo "Next week starts: $NEXT_SATURDAY"
+
+      - name: Run plan.py
+        id: plan
+        run: |
+          DATE="${{ steps.date.outputs.next_saturday }}"
+          echo "Generating plan for $DATE..."
+
+          # Run plan.py with next Saturday's date
+          python -c "
+          import sys
+          sys.path.insert(0, 'src')
+          from sd311_fieldprep.plan import run_plan
+
+          date = '$DATE'
+          print(f'Running plan for {date}...')
+
+          # Week 1 uses is_week_1=True, subsequent weeks use False
+          # You'll need to track which week number this is
+          plan_csv = run_plan(
+              date=date,
+              interviewers=('A', 'B', 'C', 'D', 'E', 'F'),
+              tasks=('DH', 'D2DS'),
+              list_code=30,
+              seed=42,
+              is_week_1=False  # Set to True only for the very first week
+          )
+          print(f'Plan created: {plan_csv}')
+          " | tee plan_output.log
+
+          # Extract plan CSV path from output
+          PLAN_CSV=$(grep "Plan created:" plan_output.log | sed 's/Plan created: //')
+          echo "plan_csv=$PLAN_CSV" >> $GITHUB_OUTPUT
+          echo "Plan CSV: $PLAN_CSV"
+
+      - name: Run emit.py
+        run: |
+          DATE="${{ steps.date.outputs.next_saturday }}"
+          PLAN_CSV="${{ steps.plan.outputs.plan_csv }}"
+
+          echo "Running emit for $DATE..."
+
+          python -c "
+          import sys
+          sys.path.insert(0, 'src')
+          from sd311_fieldprep.emit import run_emit
+
+          run_emit(
+              date='$DATE',
+              plan_csv='$PLAN_CSV',
+              bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet'
+          )
+          print('Emit completed!')
+          "
+
+      - name: Prepare upload directory
+        id: prepare
+        run: |
+          DATE="${{ steps.date.outputs.next_saturday }}"
+          UPLOAD_DIR="outputs/incoming/daily/$DATE"
+
+          echo "upload_dir=$UPLOAD_DIR" >> $GITHUB_OUTPUT
+
+          # List generated files
+          echo "Generated files:"
+          ls -lh "$UPLOAD_DIR"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
+
+      - name: Upload to Google Drive
+        uses: google-github-actions/upload-cloud-storage@v2
+        with:
+          path: ${{ steps.prepare.outputs.upload_dir }}
+          destination: ${{ secrets.GOOGLE_DRIVE_BUCKET }}/${{ steps.date.outputs.next_saturday }}
+          parent: false
+
+      - name: Send success notification
+        if: success()
+        run: |
+          DATE="${{ steps.date.outputs.next_saturday }}"
+          echo "✅ Weekly plan and emit completed successfully for $DATE"
+          echo "Files uploaded to Google Drive"
+
+      - name: Send failure notification
+        if: failure()
+        run: |
+          DATE="${{ steps.date.outputs.next_saturday }}"
+          echo "❌ Weekly plan and emit failed for $DATE"
+          echo "Check the logs for details"
+
+      - name: Archive logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-emit-logs-${{ steps.date.outputs.next_saturday }}
+          path: |
+            plan_output.log
+            outputs/incoming/daily/${{ steps.date.outputs.next_saturday }}/*.csv
+          retention-days: 30

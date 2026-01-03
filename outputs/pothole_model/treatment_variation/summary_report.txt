@@ -1,0 +1,64 @@
+
+======================================================================
+TREATMENT VARIATION ANALYSIS - SUMMARY REPORT
+======================================================================
+
+QUESTION:
+Among eligible bundles (with potholes in preceding week), do we have
+both FIXED and UNFIXED segments each week to ensure treatment variation?
+
+GOAL:
+Avoid weeks where treatment is all 0 (all unfixed) or all 1 (all fixed),
+which would eliminate treatment variation.
+
+DATA:
+- Historical period: 2021-2025
+- Total weeks analyzed: 261
+- Weeks with potholes in eligible bundles: 259
+
+RESULTS:
+
+1. SEGMENT COUNTS (Mean per week):
+   - Segments with potholes: 8.2
+   - Segments fixed (R_it=1): 2.9
+   - Segments unfixed (R_it=0): 5.3
+
+2. PROPORTION (Among segments with potholes):
+   - Mean % fixed: 38.4%
+   - Mean % unfixed: 61.6%
+   - Median % fixed: 33.3%
+   - Std % fixed: 29.2%
+
+3. TREATMENT VARIATION:
+   - Weeks with BOTH fixed and unfixed: 192/261 (73.6%)
+   - Weeks WITHOUT variation: 69/261 (26.4%)
+
+4. ISSUE BREAKDOWN:
+   - good_variation      : 192 weeks ( 73.6%)
+   - all_unfixed         :  50 weeks ( 19.2%)
+   - all_fixed           :  17 weeks (  6.5%)
+   - no_potholes         :   2 weeks (  0.8%)
+
+5. BALANCE ANALYSIS (Among weeks with potholes):
+   - 10-90% split: 189/259 ( 73.0%)
+   - 20-80% split: 162/259 ( 62.5%)
+   - 30-70% split: 114/259 ( 44.0%)
+   - 40-60% split:  63/259 ( 24.3%)
+
+CONCLUSION: ⚠ LIMITED VARIATION
+
+73.6% of weeks have both fixed and unfixed segments.
+Mean fix rate is 38.4%, indicating substantial treatment variation.
+
+⚠ Some weeks lack treatment variation - may need to adjust design.
+
+======================================================================
+OUTPUT FILES:
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/treatment_variation/treatment_variation_by_week.csv
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/treatment_variation/1_timeseries_counts.png
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/treatment_variation/2_timeseries_percentages.png
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/treatment_variation/3_distribution_pct_fixed.png
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/treatment_variation/4_variation_status_pie.png
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/treatment_variation/5_issue_breakdown.png
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/treatment_variation/summary_report.txt
+======================================================================

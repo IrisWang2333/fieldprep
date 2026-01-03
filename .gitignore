@@ -1,0 +1,90 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.pytest_cache/
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Data files (large)
+data/*.csv
+data/*.parquet
+data/*.shp
+data/*.geojson
+outputs/bundles/**/*.parquet
+outputs/bundles/**/*.geojson
+outputs/simulation/*.csv
+outputs/incoming/**/*
+
+# Large HTML map files
+outputs/**/*_map.html
+outputs/**/*.parquet
+outputs/**/*.pkl
+
+# Keep directory structure but ignore contents
+!data/.gitkeep
+!outputs/bundles/.gitkeep
+!outputs/simulation/.gitkeep
+!outputs/incoming/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+
+# Google Drive credentials
+credentials.json
+token.json
+client_secret.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Temporary files
+*.tmp
+*.temp

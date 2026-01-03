@@ -1,0 +1,48 @@
+
+======================================================================
+BUNDLE ELIGIBILITY ANALYSIS - SUMMARY REPORT
+======================================================================
+
+QUESTION:
+Conditional on at least one segment having at least one reported pothole
+in the preceding week, can we have enough bundles in a week?
+
+DATA:
+- Historical period: 2021-2025
+- Total weeks analyzed: 261
+- Total bundles in pool: 1,627
+
+RESULTS:
+Eligible bundles per week (with pothole in preceding week):
+  Mean:   50.7 bundles
+  Median: 45.0 bundles
+  Range:  [3, 158] bundles
+  Std:    21.8 bundles
+
+Percentage of total pool:
+  Mean: 3.12%
+  This means approximately 3.1% of bundles are "active"
+  (had pothole in preceding week) in any given week.
+
+Sufficiency Analysis (weeks meeting threshold):
+  ≥ 6 bundles: 260/261 weeks ( 99.6%)
+  ≥10 bundles: 260/261 weeks ( 99.6%)
+  ≥20 bundles: 260/261 weeks ( 99.6%)
+  ≥30 bundles: 244/261 weeks ( 93.5%)
+  ≥50 bundles:  97/261 weeks ( 37.2%)
+
+CONCLUSION:
+✓ SUFFICIENT
+On average, 50.7 bundles per week are eligible
+(had pothole in preceding week).
+
+✓ 99.6% of weeks have ≥6 eligible bundles
+✓ 99.6% of weeks have ≥10 eligible bundles
+✓ 99.6% of weeks have ≥20 eligible bundles
+
+======================================================================
+OUTPUT FILES:
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/bundle_eligibility_simple/weekly_eligibility.csv
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/bundle_eligibility_simple/bundle_eligibility_summary.png
+- /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/bundle_eligibility_simple/summary_report.txt
+======================================================================

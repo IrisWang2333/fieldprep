@@ -1,0 +1,38 @@
+
+D2DS FEASIBILITY ANALYSIS SUMMARY
+======================================================================
+
+1. BUNDLE ELIGIBILITY (Conditional on Preceding Week Potholes)
+   - Mean eligible bundles per week: 50.7
+   - Mean eligible DH bundles: 17.9
+   - Mean eligible non-DH bundles: 32.8
+   - Weeks with <4 DH bundles: 1 / 261 (0.4%)
+   - Weeks with <6 total bundles: 1 / 261 (0.4%)
+
+   CONCLUSION: FEASIBLE
+   ✓ Sufficient eligible bundles in most weeks
+
+2. UNFIXED SEGMENTS AVAILABILITY
+   - Mean unfixed segments per bundle-week: 0.73
+   - Median unfixed segments: 1.0
+   - Bundle-weeks with ≥1 unfixed: 9045 (68.1%)
+
+   CONCLUSION: LIMITED
+   ⚠ Limited unfixed segments
+
+3. D2DS SEGMENTS FIX TIMING (Historical)
+   - Fixed before Saturday: 0 (0.0%)
+   - Mean days to fix: 11.7 days
+
+   CONCLUSION: LOW CONTAMINATION
+   ✓ Most fixes occur after survey week starts
+
+4. HISTORICAL D2DS SEGMENTS EXPOSURE
+   - Pothole rate: 1.19%
+   - Fix rate (among potholes): 34.20%
+   - Had pothole in preceding week: 1.19%
+   - Fixed in preceding week (among those with pothole): 34.27%
+
+OVERALL FEASIBILITY: NEEDS ADJUSTMENT ⚠
+
+All outputs saved to: /Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/pothole_model/d2ds_feasibility
