@@ -77,6 +77,7 @@ def upload_directory_to_drive(
     print(f"Files to upload: {len(files_to_upload)}")
 
     uploaded_ids = []
+    failed_files = []
 
     for file_path in files_to_upload:
         if file_path.is_file():
@@ -106,10 +107,21 @@ def upload_directory_to_drive(
 
             except Exception as e:
                 print(f"  ✗ Error uploading {file_path.name}: {e}")
+                failed_files.append((file_path.name, str(e)))
 
     print(f"\n{'='*70}")
     print(f"Upload complete: {len(uploaded_ids)}/{len(files_to_upload)} files")
     print(f"{'='*70}")
+
+    # Raise error if any files failed
+    if failed_files:
+        print(f"\n❌ Failed to upload {len(failed_files)} file(s):")
+        for filename, error in failed_files:
+            print(f"  - {filename}: {error}")
+        if len(uploaded_ids) == 0:
+            raise RuntimeError(f"All {len(files_to_upload)} files failed to upload")
+        else:
+            raise RuntimeError(f"{len(failed_files)} out of {len(files_to_upload)} files failed to upload")
 
     return uploaded_ids
 
