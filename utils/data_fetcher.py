@@ -12,8 +12,20 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import requests
 
-# Data paths
-DATA_DIR = Path("/Users/iris/Dropbox/sandiego code/data")
+# Data paths - use relative to project root
+# Try to find project root (where .git or src exists)
+def get_project_root():
+    """Find project root directory."""
+    current = Path(__file__).resolve()
+    # Go up to find project root (where src/ exists)
+    for parent in [current.parent.parent, current.parent.parent.parent]:
+        if (parent / 'src').exists() or (parent / '.git').exists():
+            return parent
+    # Fallback to hardcoded path for local development
+    return Path("/Users/iris/Dropbox/sandiego code/code/fieldprep")
+
+PROJECT_ROOT = get_project_root()
+DATA_DIR = PROJECT_ROOT / "data"
 NOTIFICATION_ACTIVITIES_LOCAL = DATA_DIR / "notification_activities.csv"
 NOTIFICATION_ACTIVITIES_URL = "https://seshat.datasd.org/td_optimizations/notification_activities.csv"
 
@@ -42,6 +54,8 @@ def fetch_latest_notification_activities(use_local=True, download_if_missing=Tru
             print(f"Downloading from: {NOTIFICATION_ACTIVITIES_URL}")
             try:
                 df = pd.read_csv(NOTIFICATION_ACTIVITIES_URL)
+                # Create data directory if it doesn't exist
+                DATA_DIR.mkdir(parents=True, exist_ok=True)
                 # Save locally for future use
                 df.to_csv(NOTIFICATION_ACTIVITIES_LOCAL, index=False)
                 print(f"Saved to: {NOTIFICATION_ACTIVITIES_LOCAL}")

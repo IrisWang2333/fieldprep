@@ -58,6 +58,9 @@ outputs/**/*_map.html
 outputs/**/*.parquet
 outputs/**/*.pkl
 
+# Exception: allow specific bundle file needed for workflow
+!outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet
+
 # Keep directory structure but ignore contents
 !data/.gitkeep
 !outputs/bundles/.gitkeep
