@@ -122,17 +122,19 @@ jobs:
           echo "Generated files:"
           ls -lh "$UPLOAD_DIR"
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
-
       - name: Upload to Google Drive
-        uses: google-github-actions/upload-cloud-storage@v2
-        with:
-          path: ${{ steps.prepare.outputs.upload_dir }}
-          destination: ${{ secrets.GOOGLE_DRIVE_BUCKET }}/${{ steps.date.outputs.next_saturday }}
-          parent: false
+        env:
+          GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: |
+          DATE="${{ steps.date.outputs.next_saturday }}"
+          UPLOAD_DIR="outputs/incoming/daily/$DATE"
+
+          echo "Uploading to Google Drive..."
+          python scripts/upload_to_drive.py \
+            "$UPLOAD_DIR" \
+            "$GOOGLE_DRIVE_FOLDER_ID" \
+            --credentials-json "$GOOGLE_DRIVE_CREDENTIALS"
 
       - name: Send success notification
         if: success()
