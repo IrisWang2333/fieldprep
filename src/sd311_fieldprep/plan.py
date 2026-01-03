@@ -285,7 +285,7 @@ def run_plan(
 
         # Unique bundles with counts
         u = (
-            g[["bundle_id", "bundle_addr_total", "segment_id"]]
+            g[["bundle_id", "bundle_addr_total"]]
             .drop_duplicates("bundle_id")
             .rename(columns={"bundle_addr_total": "sfh_bundle_total"})
         )
@@ -302,8 +302,9 @@ def run_plan(
             .drop_duplicates()
             .groupby("bundle_id")["segment_id"]
             .agg(list)
+            .rename("_seg_ids")
         )
-        u = u.join(seg_ids_by_bundle, on="bundle_id").rename(columns={"segment_id": "_seg_ids"})
+        u = u.join(seg_ids_by_bundle, on="bundle_id")
         u = u.reset_index(drop=True)
 
         # No-overlap filter (segment-disjoint from already used)
