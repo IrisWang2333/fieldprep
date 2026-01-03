@@ -88,6 +88,8 @@ logs/
 credentials.json
 token.json
 client_secret.json
+client_secrets.json
+oauth_credentials.json
 
 # macOS
 .DS_Store

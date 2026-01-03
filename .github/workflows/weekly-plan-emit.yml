@@ -141,7 +141,7 @@ jobs:
 
       - name: Upload to Google Drive
         env:
-          GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
+          GOOGLE_DRIVE_OAUTH_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_OAUTH_CREDENTIALS }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: |
           DATE="${{ steps.date.outputs.next_saturday }}"
@@ -151,7 +151,7 @@ jobs:
           python scripts/upload_to_drive.py \
             "$UPLOAD_DIR" \
             "$GOOGLE_DRIVE_FOLDER_ID" \
-            --credentials-json "$GOOGLE_DRIVE_CREDENTIALS"
+            --oauth-credentials "$GOOGLE_DRIVE_OAUTH_CREDENTIALS"
 
       - name: Send success notification
         if: success()

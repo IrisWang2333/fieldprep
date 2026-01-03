@@ -16,7 +16,8 @@ def upload_directory_to_drive(
     local_dir,
     folder_id,
     credentials_path=None,
-    credentials_json=None
+    credentials_json=None,
+    oauth_credentials_json=None
 ):
     """
     Upload all files in a directory to a Google Drive folder.
@@ -31,6 +32,8 @@ def upload_directory_to_drive(
         Path to service account JSON file
     credentials_json : str, optional
         Service account JSON as string
+    oauth_credentials_json : str, optional
+        OAuth credentials JSON as string (recommended for personal Drive)
 
     Returns
     -------
@@ -40,8 +43,23 @@ def upload_directory_to_drive(
     # Authenticate
     SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
-    if credentials_json:
-        # Use JSON string (from GitHub secret)
+    if oauth_credentials_json:
+        # Use OAuth credentials (works with personal Google Drive)
+        import json
+        from google.oauth2.credentials import Credentials
+
+        creds_dict = json.loads(oauth_credentials_json)
+        credentials = Credentials(
+            token=creds_dict['token'],
+            refresh_token=creds_dict['refresh_token'],
+            token_uri=creds_dict['token_uri'],
+            client_id=creds_dict['client_id'],
+            client_secret=creds_dict['client_secret'],
+            scopes=creds_dict['scopes']
+        )
+    elif credentials_json:
+        # Use service account JSON string (from GitHub secret)
+        # Note: Service accounts cannot upload to personal Drive folders
         import json
         import tempfile
         creds_dict = json.loads(credentials_json)
@@ -49,12 +67,12 @@ def upload_directory_to_drive(
             creds_dict, scopes=SCOPES
         )
     elif credentials_path:
-        # Use JSON file
+        # Use service account JSON file
         credentials = service_account.Credentials.from_service_account_file(
             credentials_path, scopes=SCOPES
         )
     else:
-        raise ValueError("Must provide either credentials_path or credentials_json")
+        raise ValueError("Must provide either credentials_path, credentials_json, or oauth_credentials_json")
 
     # Build Drive service
     service = build('drive', 'v3', credentials=credentials)
@@ -142,6 +160,11 @@ def main():
         help='Service account JSON as string (from env var)',
         default=os.getenv('GOOGLE_DRIVE_CREDENTIALS')
     )
+    parser.add_argument(
+        '--oauth-credentials',
+        help='OAuth credentials JSON as string (recommended for personal Drive)',
+        default=os.getenv('GOOGLE_DRIVE_OAUTH_CREDENTIALS')
+    )
 
     args = parser.parse_args()
 
@@ -150,7 +173,8 @@ def main():
             local_dir=args.local_dir,
             folder_id=args.folder_id,
             credentials_path=args.credentials,
-            credentials_json=args.credentials_json
+            credentials_json=args.credentials_json,
+            oauth_credentials_json=args.oauth_credentials
         )
 
         print(f"\n✅ Successfully uploaded {len(uploaded_ids)} files to Google Drive!")
