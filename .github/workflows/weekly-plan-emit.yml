@@ -32,10 +32,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download geospatial data
+      - name: Verify geospatial data
         run: |
-          echo "Downloading geospatial data files..."
-          python scripts/download_data.py
+          echo "Verifying geospatial data files..."
+          ls -lh data/raw/DataSD/
+          echo "✓ Geospatial data ready (included in repository)"
 
       - name: Download latest notification activities
         run: |

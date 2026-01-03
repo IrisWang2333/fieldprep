@@ -48,6 +48,15 @@ data/*.csv
 data/*.parquet
 data/*.shp
 data/*.geojson
+
+# Exception: Allow required geospatial data for GitHub Actions
+!data/raw/DataSD/sd_paving_segs_datasd/**
+!data/raw/DataSD/addrapn_datasd/**
+!data/raw/DataSD/council_districts_datasd/**
+!data/raw/DataSD/zoning_datasd/**
+!data/raw/DataSD/cmty_plan_datasd/**
+!data/raw/DataSD/san_diego_boundary_datasd/**
+
 outputs/bundles/**/*.parquet
 outputs/bundles/**/*.geojson
 outputs/simulation/*.csv
@@ -91,3 +100,6 @@ client_secret.json
 # Temporary files
 *.tmp
 *.temp
+
+# Geospatial data archive (data is in repository)
+geospatial_data.tar.gz
