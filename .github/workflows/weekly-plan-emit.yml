@@ -86,6 +86,7 @@ jobs:
               tasks=('DH', 'D2DS'),
               list_code=30,
               seed=42,
+              bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet',
               is_week_1=False  # Set to True only for the very first week
           )
           print(f'Plan created: {plan_csv}')
