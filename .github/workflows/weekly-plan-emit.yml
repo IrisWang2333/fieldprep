@@ -88,8 +88,9 @@ jobs:
           date = '$DATE'
           print(f'Running plan for {date}...')
 
-          # Week 1 uses is_week_1=True, subsequent weeks use False
-          # You'll need to track which week number this is
+          # Pilot phase (until 2026-01-10): Use Week 1 design (DH only, no D2DS)
+          # Week 1 (2026-01-10): First official week, use is_week_1=True
+          # Week 2+ (after 2026-01-10): Use is_week_1=False (DH + D2DS)
           plan_csv = run_plan(
               date=date,
               interviewers=('A', 'B', 'C', 'D', 'E', 'F'),
@@ -97,7 +98,7 @@ jobs:
               list_code=30,
               seed=42,
               bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet',
-              is_week_1=False  # Set to True only for the very first week
+              is_week_1=True  # Pilot phase - use Week 1 design (24 DH, no D2DS)
           )
           print(f'Plan created: {plan_csv}')
           " | tee plan_output.log

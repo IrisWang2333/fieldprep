@@ -172,8 +172,10 @@ def run_plan(
     Generate daily plan using conditional sampling based on historical pothole data.
 
     New Design (Single Layer Randomization):
-    - Week 1 (is_week_1=True): 30 DH bundles (4 conditional + 26 random), NO D2DS
+    - Week 1 (is_week_1=True): 24 DH bundles (4 conditional + 20 random), NO D2DS
+      - 6 interviewers × 4 bundles each = 24 total
     - Week 2+ (is_week_1=False): 6 DH (4 conditional + 2 random) + 6 D2DS (4 from DH conditional + 2 random)
+      - Each interviewer gets 1 DH + 1 D2DS
 
     Conditional = bundle had at least one pothole in preceding week (based on latest data)
 
@@ -449,21 +451,22 @@ def run_plan(
             # Get interviewer
             ivw = interviewers[i % len(interviewers)]
 
-            # Check if this bundle is from DH conditional (already assigned)
+            # Get bundle details (from either d2ds_conditional or d2ds_random)
             if bundle_id in d2ds_conditional:
-                # Update existing DH row to indicate it's also D2DS
-                # (In practice, these bundles get both DH and D2DS treatment)
-                continue
+                # This bundle is from DH conditional - get details from all_candidates
+                bundle_row = all_candidates[all_candidates['bundle_id'] == bundle_id]
+            else:
+                # This is a D2DS random bundle (new, not in DH) - get from d2ds_details
+                bundle_row = d2ds_details[d2ds_details['bundle_id'] == bundle_id]
 
-            # This is a D2DS random bundle (new, not in DH)
-            bundle_row = d2ds_details[d2ds_details['bundle_id'] == bundle_id]
             if len(bundle_row) == 0:
                 print(f"  WARNING: Bundle {bundle_id} not found in candidates, skipping")
                 continue
 
             n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
-            seg_list = bundle_row['_seg_ids'].iloc[0]
+            seg_list = bundle_row['_seg_ids'].iloc[0] if bundle_id in d2ds_random else []
 
+            # Create D2DS task row (for both conditional and random bundles)
             rows.append({
                 "date": date,
                 "interviewer": ivw,
@@ -473,8 +476,9 @@ def run_plan(
                 "sfh_bundle_total": n_sfh,
             })
 
-            # Mark segments as used
-            used_seg_ids.update({str(x) for x in (seg_list or [])})
+            # Mark segments as used (only for random bundles, conditional already marked)
+            if bundle_id in d2ds_random:
+                used_seg_ids.update({str(x) for x in (seg_list or [])})
 
     elif is_week_1:
         print(f"\n[D2DS Sampling] Skipped (Week 1 has no D2DS)")

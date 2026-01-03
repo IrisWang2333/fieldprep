@@ -3,9 +3,13 @@
 Sampling Utilities for DH Bundle Selection
 
 Implements the single-layer randomization design:
-- Day 1: 30 DH bundles (4 conditional + 26 random)
-- Day 2+: 6 DH bundles per week (4 conditional + 2 random)
-- D2DS: Selected from the 4 conditional DH bundles
+- Day 1 (Week 1): 24 DH bundles (4 conditional + 20 random), NO D2DS
+  - 6 interviewers × 4 bundles each = 24 total
+- Day 2+ (Week 2+): 6 DH + 6 D2DS per week
+  - DH: 4 conditional + 2 random = 6 total
+  - D2DS: 4 from DH conditional + 2 random = 6 total
+
+Conditional = bundle had at least one pothole in preceding week
 """
 import pandas as pd
 import numpy as np
@@ -23,8 +27,8 @@ def sample_dh_bundles(
     """
     Sample DH bundles according to the design.
 
-    Day 1: 30 DH bundles (4 conditional + 26 random)
-    Day 2+: 6 DH bundles per week (4 conditional + 2 random)
+    Day 1 (Week 1): 24 DH bundles (4 conditional + 20 random)
+    Day 2+ (Week 2+): 6 DH bundles per week (4 conditional + 2 random)
 
     Parameters
     ----------
@@ -56,11 +60,11 @@ def sample_dh_bundles(
     # Determine sample sizes
     if is_day_1:
         n_conditional = 4
-        n_random = 26
-        print(f"\n[Day 1 Sampling] Sampling {n_conditional} conditional + {n_random} random DH bundles")
+        n_random = 20  # 6 interviewers × 4 bundles = 24 total (4 cond + 20 random)
+        print(f"\n[Day 1 Sampling] Sampling {n_conditional} conditional + {n_random} random DH bundles (6 interviewers × 4 bundles)")
     else:
         n_conditional = 4
-        n_random = 2
+        n_random = 2  # 6 interviewers: 4 get 1 DH, 2 get random → 6 total (4 cond + 2 random)
         print(f"\n[Regular Sampling] Sampling {n_conditional} conditional + {n_random} random DH bundles")
 
     # Sample conditional bundles (from eligible pool)
