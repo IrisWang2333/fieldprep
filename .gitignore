@@ -70,6 +70,9 @@ outputs/**/*.pkl
 # Exception: allow specific bundle file needed for workflow
 !outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet
 
+# Exception: allow locked address assignments needed for emit
+!outputs/sweep/locked/segment_addresses_b40_m2.parquet
+
 # Keep directory structure but ignore contents
 !data/.gitkeep
 !outputs/bundles/.gitkeep
