@@ -31,6 +31,12 @@ from utils.sampling import (
     select_d2ds_bundles,
     get_week_start
 )
+from utils.bundle_tracker import (
+    get_used_bundles,
+    get_previous_week_conditional_bundles,
+    filter_available_bundles,
+    print_usage_summary
+)
 
 
 def _endpoints_xy(geom):
@@ -167,6 +173,7 @@ def run_plan(
     out_csv: str | None = None,
     bundle_file: str | None = None,
     is_week_1: bool = False,
+    official_start_date: str = "2026-01-10",
 ):
     """
     Generate daily plan using conditional sampling based on historical pothole data.
@@ -199,6 +206,10 @@ def run_plan(
                      If None (default), each task uses its own bundle file from
                      outputs/bundles/{task}/bundles.parquet
         is_week_1: Whether this is Week 1 (special sampling: 30 DH, no D2DS)
+        official_start_date: Official experiment start date (YYYY-MM-DD).
+                            Only plans on or after this date are tracked for without-replacement.
+                            Plans before this date (e.g., pilot) are ignored.
+                            Default: "2026-01-10"
     """
     root, _, out_root = paths()
     rng = np.random.default_rng(int(seed))
@@ -213,6 +224,20 @@ def run_plan(
     activities = fetch_latest_notification_activities(use_local=False, download_if_missing=True)
     print(f"[Data Loading] Loaded {len(activities):,} pothole records")
     print(f"[Data Loading] Date range: {activities['date_reported'].min()} to {activities['date_reported'].max()}")
+
+    # ============================================================================
+    # BUNDLE TRACKING: Load historical bundle usage to ensure without-replacement
+    # ============================================================================
+    print(f"\n[Bundle Tracking] Checking historical bundle usage...")
+    print(f"  Official experiment start: {official_start_date}")
+    print(f"  (Plans before this date are excluded from tracking)")
+    plan_dir = out_root / "plans"
+    used_tracker = get_used_bundles(plan_dir, exclude_date=date, min_date=official_start_date)
+
+    if used_tracker['all']:
+        print_usage_summary(used_tracker)
+    else:
+        print("  No historical plans found - this appears to be the first plan")
 
     # Load sources/config (for CRS + optional CPD layer)
     streets, addrs, ds, pr = load_sources()
@@ -343,8 +368,13 @@ def run_plan(
     print(f"  Eligible candidates (conditional pool): {len(eligible_candidates)}")
 
     # Get all bundle IDs for sampling
-    all_bundle_ids = set(all_candidates["bundle_id"].unique())
-    eligible_bundle_ids_filtered = set(eligible_candidates["bundle_id"].unique())
+    all_bundle_ids_before_filter = set(all_candidates["bundle_id"].unique())
+
+    # Filter out previously used bundles to ensure without-replacement
+    all_bundle_ids = filter_available_bundles(all_bundle_ids_before_filter, used_tracker)
+
+    # Also filter eligible bundles
+    eligible_bundle_ids_filtered = set(eligible_candidates["bundle_id"].unique()) & all_bundle_ids
 
     # ============================================================================
     # Sample bundles using new conditional logic
@@ -413,12 +443,22 @@ def run_plan(
     if not is_week_1 and "D2DS" in [t.upper() for t in tasks]:
         print(f"\n[D2DS Sampling] Selecting D2DS bundles...")
 
+        # CRITICAL: D2DS conditional bundles should come from PREVIOUS week's DH conditional
+        # NOT from current week's DH conditional!
+        prev_week_conditional = get_previous_week_conditional_bundles(
+            plan_dir=plan_dir,
+            current_date=date,
+            activities_df=activities,
+            bundles_df=g_dh,
+            min_date=official_start_date
+        )
+
         # Update available bundles (exclude already used DH bundles)
         all_available_for_d2ds = all_bundle_ids - set(sampled_dh_bundles)
 
-        # Use select_d2ds_bundles utility
+        # Use select_d2ds_bundles utility with PREVIOUS week's conditional bundles
         d2ds_selection = select_d2ds_bundles(
-            conditional_bundles=dh_conditional_bundles,
+            conditional_bundles=prev_week_conditional,
             all_bundles=all_available_for_d2ds,
             bundles_df=g_dh,
             n_from_conditional=4,

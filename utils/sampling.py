@@ -72,25 +72,30 @@ def sample_dh_bundles(
         print(f"  WARNING: Only {len(eligible_bundles)} eligible bundles available, need {n_conditional}")
         print(f"  Sampling all {len(eligible_bundles)} eligible bundles")
         conditional_sample = list(eligible_bundles)
+        # Compensate by sampling more random bundles to maintain total count
+        deficit = n_conditional - len(conditional_sample)
+        n_random_adjusted = n_random + deficit
+        print(f"  Compensating by sampling {deficit} additional random bundles ({n_random} + {deficit} = {n_random_adjusted})")
     else:
         conditional_sample = list(rng.choice(
             list(eligible_bundles),
             size=n_conditional,
             replace=False
         ))
+        n_random_adjusted = n_random
 
     print(f"  Conditional bundles sampled: {len(conditional_sample)}")
 
     # Sample random bundles (from all bundles, excluding already sampled)
     remaining_bundles = all_bundles - set(conditional_sample)
 
-    if len(remaining_bundles) < n_random:
-        print(f"  WARNING: Only {len(remaining_bundles)} bundles remain for random sampling, need {n_random}")
+    if len(remaining_bundles) < n_random_adjusted:
+        print(f"  WARNING: Only {len(remaining_bundles)} bundles remain for random sampling, need {n_random_adjusted}")
         random_sample = list(remaining_bundles)
     else:
         random_sample = list(rng.choice(
             list(remaining_bundles),
-            size=n_random,
+            size=n_random_adjusted,
             replace=False
         ))
 
@@ -156,26 +161,31 @@ def select_d2ds_bundles(
 
     print(f"\n[D2DS Selection] Selecting {n_from_conditional} from conditional + {n_random} random bundles")
 
-    # Take all 4 conditional bundles for D2DS
+    # Take all conditional bundles for D2DS (up to n_from_conditional)
     if len(conditional_bundles) < n_from_conditional:
         print(f"  WARNING: Only {len(conditional_bundles)} conditional bundles available, need {n_from_conditional}")
         d2ds_conditional = list(conditional_bundles)
+        # Compensate by sampling more random bundles to maintain total count
+        deficit = n_from_conditional - len(d2ds_conditional)
+        n_random_adjusted = n_random + deficit
+        print(f"  Compensating by sampling {deficit} additional random bundles ({n_random} + {deficit} = {n_random_adjusted})")
     else:
-        # Use all 4 conditional bundles
+        # Use all conditional bundles (up to n_from_conditional)
         d2ds_conditional = list(conditional_bundles)[:n_from_conditional]
+        n_random_adjusted = n_random
 
     print(f"  D2DS from conditional: {len(d2ds_conditional)}")
 
     # Sample additional random bundles (excluding already selected)
     remaining_bundles = set(all_bundles) - set(d2ds_conditional)
 
-    if len(remaining_bundles) < n_random:
-        print(f"  WARNING: Only {len(remaining_bundles)} bundles remain for random D2DS, need {n_random}")
+    if len(remaining_bundles) < n_random_adjusted:
+        print(f"  WARNING: Only {len(remaining_bundles)} bundles remain for random D2DS, need {n_random_adjusted}")
         d2ds_random = list(remaining_bundles)
     else:
         d2ds_random = list(rng.choice(
             list(remaining_bundles),
-            size=n_random,
+            size=n_random_adjusted,
             replace=False
         ))
 
