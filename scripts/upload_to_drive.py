@@ -95,41 +95,55 @@ def upload_directory_to_drive(
     print(f"{'='*70}")
     print(f"Local directory: {local_dir}")
     print(f"Parent folder ID: {folder_id}")
-    print(f"Creating subfolder: {date_folder_name}")
+    print(f"Checking for subfolder: {date_folder_name}")
 
-    # Create a subfolder in Google Drive with the date name
-    subfolder_metadata = {
-        'name': date_folder_name,
-        'mimeType': 'application/vnd.google-apps.folder',
-        'parents': [folder_id]
-    }
-
+    # Check if subfolder already exists
     try:
-        subfolder = service.files().create(
-            body=subfolder_metadata,
-            fields='id, name, webViewLink'
+        query = f"name='{date_folder_name}' and '{folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        results = service.files().list(
+            q=query,
+            spaces='drive',
+            fields='files(id, name, webViewLink)'
         ).execute()
 
-        subfolder_id = subfolder.get('id')
-        print(f"✓ Created subfolder: {subfolder.get('name')}")
-        print(f"  Folder ID: {subfolder_id}")
-        print(f"  Link: {subfolder.get('webViewLink')}")
+        existing_folders = results.get('files', [])
+
+        if existing_folders:
+            # Use existing folder
+            subfolder = existing_folders[0]
+            subfolder_id = subfolder.get('id')
+            print(f"✓ Found existing subfolder: {subfolder.get('name')}")
+            print(f"  Folder ID: {subfolder_id}")
+            print(f"  Link: {subfolder.get('webViewLink')}")
+        else:
+            # Create new subfolder
+            subfolder_metadata = {
+                'name': date_folder_name,
+                'mimeType': 'application/vnd.google-apps.folder',
+                'parents': [folder_id]
+            }
+
+            subfolder = service.files().create(
+                body=subfolder_metadata,
+                fields='id, name, webViewLink'
+            ).execute()
+
+            subfolder_id = subfolder.get('id')
+            print(f"✓ Created new subfolder: {subfolder.get('name')}")
+            print(f"  Folder ID: {subfolder_id}")
+            print(f"  Link: {subfolder.get('webViewLink')}")
+
         print(f"\nFiles to upload: {len(files_to_upload)}")
     except Exception as e:
-        print(f"✗ Error creating subfolder: {e}")
-        raise RuntimeError(f"Failed to create subfolder '{date_folder_name}': {e}")
+        print(f"✗ Error handling subfolder: {e}")
+        raise RuntimeError(f"Failed to handle subfolder '{date_folder_name}': {e}")
 
     uploaded_ids = []
     failed_files = []
 
     for file_path in files_to_upload:
         if file_path.is_file():
-            print(f"\nUploading: {file_path.name}...")
-
-            file_metadata = {
-                'name': file_path.name,
-                'parents': [subfolder_id]  # Upload to the date subfolder
-            }
+            print(f"\nProcessing: {file_path.name}...")
 
             media = MediaFileUpload(
                 str(file_path),
@@ -137,19 +151,49 @@ def upload_directory_to_drive(
             )
 
             try:
-                file = service.files().create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields='id, name, webViewLink'
+                # Check if file already exists in this folder
+                query = f"name='{file_path.name}' and '{subfolder_id}' in parents and trashed=false"
+                results = service.files().list(
+                    q=query,
+                    spaces='drive',
+                    fields='files(id, name)'
                 ).execute()
 
-                uploaded_ids.append(file.get('id'))
-                print(f"  ✓ Uploaded: {file.get('name')}")
-                print(f"    File ID: {file.get('id')}")
-                print(f"    Link: {file.get('webViewLink')}")
+                existing_files = results.get('files', [])
+
+                if existing_files:
+                    # Update existing file
+                    file_id = existing_files[0]['id']
+                    file = service.files().update(
+                        fileId=file_id,
+                        media_body=media,
+                        fields='id, name, webViewLink'
+                    ).execute()
+
+                    uploaded_ids.append(file.get('id'))
+                    print(f"  ✓ Updated existing file: {file.get('name')}")
+                    print(f"    File ID: {file.get('id')}")
+                    print(f"    Link: {file.get('webViewLink')}")
+                else:
+                    # Create new file
+                    file_metadata = {
+                        'name': file_path.name,
+                        'parents': [subfolder_id]
+                    }
+
+                    file = service.files().create(
+                        body=file_metadata,
+                        media_body=media,
+                        fields='id, name, webViewLink'
+                    ).execute()
+
+                    uploaded_ids.append(file.get('id'))
+                    print(f"  ✓ Uploaded new file: {file.get('name')}")
+                    print(f"    File ID: {file.get('id')}")
+                    print(f"    Link: {file.get('webViewLink')}")
 
             except Exception as e:
-                print(f"  ✗ Error uploading {file_path.name}: {e}")
+                print(f"  ✗ Error processing {file_path.name}: {e}")
                 failed_files.append((file_path.name, str(e)))
 
     print(f"\n{'='*70}")
