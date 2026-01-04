@@ -5,10 +5,14 @@ Multi-Day Experiment Simulation Using 2025 Historical Data
 Simulate a 30-week field experiment using 2025 historical pothole data.
 
 New Design (Single Layer Randomization):
-- Day 1: 30 DH bundles (4 conditional + 26 random), NO D2DS
-- Day 2+: Each week:
+- Week 1: 30 DH bundles (4 conditional + 26 random), NO D2DS
+- Week 2+: Each week:
   - DH: 6 bundles (4 conditional + 2 random)
-  - D2DS: 6 bundles (4 from DH conditional + 2 random)
+  - D2DS: 6 bundles (4 from PREVIOUS week's DH conditional + 2 random)
+
+IMPORTANT: D2DS conditional bundles come from the PREVIOUS week's DH conditional bundles,
+not the current week's. This ensures D2DS revisits areas that were identified as problematic
+in the previous week.
 
 Conditional = bundle had at least one pothole in preceding week (based on 2025 data)
 Sampling: Without replacement across weeks
@@ -50,7 +54,9 @@ def simulate_multiday_experiment(
 
     New Design:
     - Week 1: 30 DH bundles (4 conditional + 26 random), NO D2DS
-    - Week 2+: 6 DH (4 conditional + 2 random) + 6 D2DS (4 from DH conditional + 2 random)
+    - Week 2+: 6 DH (4 conditional + 2 random) + 6 D2DS (4 from PREVIOUS week's DH conditional + 2 random)
+
+    IMPORTANT: D2DS conditional bundles come from the PREVIOUS week's DH conditional bundles.
 
     Args:
         n_weeks: Total number of weeks (default: 30)
@@ -321,12 +327,21 @@ def simulate_multiday_experiment(
             })
             used_bundles.add(bundle_id)
 
+        # CRITICAL: D2DS conditional bundles should come from PREVIOUS week's DH conditional
+        # NOT from current week's DH conditional!
+        prev_week_conditional = [
+            r['bundle_id'] for r in plan_records
+            if r['week'] == week_num - 1 and r['bundle_type'] == 'dh_conditional'
+        ]
+
+        print(f"  Previous week (Week {week_num-1}): {len(prev_week_conditional)} DH conditional bundles")
+
         # Select D2DS bundles
         # Remove DH bundles just sampled from available pool for D2DS random selection
         all_available_for_d2ds = all_bundles - used_bundles
 
         d2ds_selection = select_d2ds_bundles(
-            conditional_bundles=dh_sample['conditional'],
+            conditional_bundles=prev_week_conditional,  # ← Use PREVIOUS week's conditional
             all_bundles=all_available_for_d2ds,
             bundles_df=bundles,
             n_from_conditional=4,
@@ -335,14 +350,21 @@ def simulate_multiday_experiment(
             segment_col='segment_id'
         )
 
-        # Mark DH conditional bundles that are also used for D2DS
+        # Add D2DS conditional bundles (from PREVIOUS week's DH conditional)
+        # These are separate D2DS task records, not combined with current week's DH
         for bundle_id in d2ds_selection['d2ds_conditional']:
-            # Update existing DH record
-            for record in plan_records:
-                if (record['week'] == week_num and
-                    record['bundle_id'] == bundle_id and
-                    record['task'] == 'DH'):
-                    record['is_d2ds'] = True
+            plan_records.append({
+                'week': week_num,
+                'date': date,
+                'bundle_id': bundle_id,
+                'bundle_type': 'd2ds_conditional',  # From previous week's DH conditional
+                'task': 'D2DS',
+                'is_d2ds': True,
+                'interviewer': None,
+                'list_code': list_code,
+            })
+            # Note: These bundles are NOT marked as used_bundles again,
+            # as they were already used in the previous week's DH
 
         # Add D2DS random bundles (these are NEW, not in DH)
         for bundle_id in d2ds_selection['d2ds_random']:
