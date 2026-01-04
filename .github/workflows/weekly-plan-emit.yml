@@ -123,7 +123,8 @@ jobs:
           run_emit(
               date='$DATE',
               plan_csv='$PLAN_CSV',
-              bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet'
+              bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet',
+              addr_assignment_file='outputs/sweep/locked/segment_addresses_b40_m2.parquet'
           )
           print('Emit completed!')
           "
