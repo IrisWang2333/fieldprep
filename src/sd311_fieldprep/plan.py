@@ -38,9 +38,9 @@ from utils.bundle_tracker import (
     print_usage_summary
 )
 
-# Import distance-based assignment
-from sd311_fieldprep.assign_bundles_by_distance import (
-    assign_bundles_for_date
+# Import minimax assignment (minimizes maximum travel time)
+from sd311_fieldprep.assign_bundles_minimax import (
+    assign_bundles_for_date_minimax
 )
 
 
@@ -425,23 +425,28 @@ def run_plan(
         # Calculate bundles per interviewer
         bundles_per_interviewer = len(sampled_dh_bundles) // len(interviewers)
 
-        # Use distance-based assignment
+        # Use minimax assignment (minimize maximum travel time)
         geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-        dh_assignments = assign_bundles_for_date(
+        dh_assignments = assign_bundles_for_date_minimax(
             date=date,
             bundles=list(sampled_dh_bundles),
             bundles_gdf=g_dh,
             geocoded_file=str(geocoded_file) if geocoded_file.exists() else None,
-            bundles_per_interviewer=bundles_per_interviewer,
-            alpha=0.7,  # 70% weight on home-to-bundle distance
-            beta=0.3    # 30% weight on bundle internal distance
+            bundles_per_interviewer=bundles_per_interviewer
         )
 
-        print(f"[Assignment Optimization] Successfully optimized DH assignments")
+        print(f"[Assignment Optimization] Successfully optimized DH assignments (minimax)")
+
+        # Print travel time summary
+        max_travel_time = 0
+        for name, (_, travel_time) in dh_assignments.items():
+            print(f"  {name}: {travel_time:.2f} km")
+            max_travel_time = max(max_travel_time, travel_time)
+        print(f"  Maximum travel time: {max_travel_time:.2f} km")
 
         # Create rows from optimized assignments
-        for interviewer_name, bundle_ids in dh_assignments.items():
+        for interviewer_name, (bundle_ids, _) in dh_assignments.items():
             for bundle_id in bundle_ids:
                 # Get bundle details
                 bundle_row = dh_details[dh_details['bundle_id'] == bundle_id]
@@ -554,23 +559,28 @@ def run_plan(
             # Calculate bundles per interviewer
             bundles_per_interviewer_d2ds = len(sampled_d2ds_bundles) // len(interviewers)
 
-            # Use distance-based assignment
+            # Use minimax assignment (minimize maximum travel time)
             geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-            d2ds_assignments = assign_bundles_for_date(
+            d2ds_assignments = assign_bundles_for_date_minimax(
                 date=date,
                 bundles=list(sampled_d2ds_bundles),
                 bundles_gdf=g_dh,
                 geocoded_file=str(geocoded_file) if geocoded_file.exists() else None,
-                bundles_per_interviewer=bundles_per_interviewer_d2ds,
-                alpha=0.7,
-                beta=0.3
+                bundles_per_interviewer=bundles_per_interviewer_d2ds
             )
 
-            print(f"[Assignment Optimization] Successfully optimized D2DS assignments")
+            print(f"[Assignment Optimization] Successfully optimized D2DS assignments (minimax)")
+
+            # Print travel time summary
+            max_travel_time_d2ds = 0
+            for name, (_, travel_time) in d2ds_assignments.items():
+                print(f"  {name}: {travel_time:.2f} km")
+                max_travel_time_d2ds = max(max_travel_time_d2ds, travel_time)
+            print(f"  Maximum travel time: {max_travel_time_d2ds:.2f} km")
 
             # Create rows from optimized assignments
-            for interviewer_name, bundle_ids in d2ds_assignments.items():
+            for interviewer_name, (bundle_ids, _) in d2ds_assignments.items():
                 for bundle_id in bundle_ids:
                     # Get bundle details (from either d2ds_conditional or d2ds_random)
                     if bundle_id in d2ds_conditional:
