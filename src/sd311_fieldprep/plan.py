@@ -502,12 +502,14 @@ def run_plan(
 
         # CRITICAL: D2DS conditional bundles should come from PREVIOUS week's DH conditional
         # NOT from current week's DH conditional!
+        # NOTE: Don't use min_date filter here - we need to include pilot plans too!
+        # For example, Jan 3 (Week 2 of pilot) needs Dec 27 (Week 1 of pilot) conditional bundles
         prev_week_conditional = get_previous_week_conditional_bundles(
             plan_dir=plan_dir,
             current_date=date,
             activities_df=activities,
             bundles_df=g_dh,
-            min_date=official_start_date
+            min_date=None  # Include all historical plans, including pilot
         )
 
         # Update available bundles (exclude already used DH bundles)
