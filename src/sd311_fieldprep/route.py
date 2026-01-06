@@ -1,16 +1,38 @@
 import geopandas as gpd
 import networkx as nx
 import numpy as np
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiLineString
 from shapely.ops import linemerge
 
 
 def _line_endpoints_xy(ls):
+    """Extract endpoints from LineString or MultiLineString geometry."""
     try:
+        # Try direct access for simple LineString
         coords = list(ls.coords)
     except Exception:
+        # Handle MultiLineString or other complex geometries
         m = linemerge(ls)
-        coords = list(getattr(m, "coords", []))
+
+        # If linemerge succeeded and returned a simple LineString
+        if hasattr(m, "coords"):
+            try:
+                coords = list(m.coords)
+            except Exception:
+                coords = []
+        # If still MultiLineString, take first and last component
+        elif isinstance(m, MultiLineString) and len(m.geoms) > 0:
+            first_line = m.geoms[0]
+            last_line = m.geoms[-1]
+            first_coords = list(first_line.coords)
+            last_coords = list(last_line.coords)
+            if len(first_coords) >= 1 and len(last_coords) >= 1:
+                # Return first point of first line and last point of last line
+                return (first_coords[0][0], first_coords[0][1]), (last_coords[-1][0], last_coords[-1][1])
+            coords = []
+        else:
+            coords = []
+
     if len(coords) < 2:
         return None, None
     return (coords[0][0], coords[0][1]), (coords[-1][0], coords[-1][1])
