@@ -1,0 +1,6 @@
+Category,Bundles,Bundles (%),Segments,Segments (%),Addresses,Addresses (%)
+DH only,82,5.0%,645,5.2%,6704,3.2%
+D2DS only,58,3.6%,420,3.4%,4788,2.3%
+Both DH & D2DS,116,7.1%,962,7.7%,9559,4.5%
+Never used,1371,84.3%,10455,83.8%,112649,53.3%
+Total Eligible,1627,100.0%,12482,100.0%,211491,100.0%
