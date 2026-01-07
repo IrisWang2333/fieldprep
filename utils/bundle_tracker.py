@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Set, List, Tuple
 
 
-def get_all_historical_plans(plan_dir: Path, min_date: str = None) -> List[Tuple[str, pd.DataFrame]]:
+def get_all_historical_plans(plan_dir: Path, min_date: str = None, max_date: str = None) -> List[Tuple[str, pd.DataFrame]]:
     """
     Get all historical plan CSV files.
 
@@ -24,6 +24,9 @@ def get_all_historical_plans(plan_dir: Path, min_date: str = None) -> List[Tuple
     min_date : str, optional
         Minimum date (YYYY-MM-DD) to include. Plans before this date are excluded.
         Useful for separating pilot from official experiment.
+    max_date : str, optional
+        Maximum date (YYYY-MM-DD) to include. Plans after this date are excluded.
+        Useful for limiting bundle tracking to specific phase (pilot or official).
 
     Returns
     -------
@@ -46,6 +49,12 @@ def get_all_historical_plans(plan_dir: Path, min_date: str = None) -> List[Tuple
                 if plan_date < min_dt:
                     continue
 
+            # Skip if after max_date
+            if max_date:
+                max_dt = datetime.strptime(max_date, "%Y-%m-%d")
+                if plan_date > max_dt:
+                    continue
+
             df = pd.read_csv(pfile)
             plans.append((date_str, df))
         except (ValueError, Exception) as e:
@@ -58,7 +67,7 @@ def get_all_historical_plans(plan_dir: Path, min_date: str = None) -> List[Tuple
     return plans
 
 
-def get_used_bundles(plan_dir: Path, exclude_date: str = None, min_date: str = None) -> Dict[str, Set[int]]:
+def get_used_bundles(plan_dir: Path, exclude_date: str = None, min_date: str = None, max_date: str = None) -> Dict[str, Set[int]]:
     """
     Get all bundles used in historical plans.
 
@@ -71,6 +80,9 @@ def get_used_bundles(plan_dir: Path, exclude_date: str = None, min_date: str = N
     min_date : str, optional
         Minimum date (YYYY-MM-DD) to include. Plans before this date are excluded.
         Useful for separating pilot from official experiment.
+    max_date : str, optional
+        Maximum date (YYYY-MM-DD) to include. Plans after this date are excluded.
+        Useful for limiting bundle tracking to specific phase (pilot or official).
 
     Returns
     -------
@@ -89,7 +101,7 @@ def get_used_bundles(plan_dir: Path, exclude_date: str = None, min_date: str = N
             }}
         }
     """
-    plans = get_all_historical_plans(plan_dir, min_date=min_date)
+    plans = get_all_historical_plans(plan_dir, min_date=min_date, max_date=max_date)
 
     used = {
         'all': set(),
@@ -127,7 +139,8 @@ def get_previous_week_conditional_bundles(
     current_date: str,
     activities_df: pd.DataFrame,
     bundles_df: pd.DataFrame,
-    min_date: str = None
+    min_date: str = None,
+    max_date: str = None
 ) -> Set[int]:
     """
     Get conditional DH bundles from previous week's plan.
@@ -147,12 +160,15 @@ def get_previous_week_conditional_bundles(
         Bundle data (for fallback)
     min_date : str, optional
         Minimum date (YYYY-MM-DD) to include. Plans before this date are excluded.
+    max_date : str, optional
+        Maximum date (YYYY-MM-DD) to include. Plans after this date are excluded.
+        Useful for limiting to same experiment phase (pilot or official).
 
     Returns
     -------
     set of bundle IDs that were conditional DH in previous week
     """
-    plans = get_all_historical_plans(plan_dir, min_date=min_date)
+    plans = get_all_historical_plans(plan_dir, min_date=min_date, max_date=max_date)
 
     if not plans:
         print("  No historical plans found, cannot determine previous week's conditional bundles")

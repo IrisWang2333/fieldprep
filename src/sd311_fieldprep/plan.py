@@ -178,7 +178,6 @@ def run_plan(
     out_csv: str | None = None,
     bundle_file: str | None = None,
     is_week_1: bool = False,
-    official_start_date: str = "2026-01-10",
 ):
     """
     Generate daily plan using conditional sampling based on historical pothole data.
@@ -190,6 +189,10 @@ def run_plan(
       - Each interviewer gets 1 DH + 1 D2DS
 
     Conditional = bundle had at least one pothole in preceding week (based on latest data)
+
+    Experiment Phases:
+    - Pilot: 2025-12-27 to 2026-01-03 (separate bundle pool with within-phase without-replacement)
+    - Official: 2026-01-10 onwards (separate bundle pool with within-phase without-replacement)
 
     Writes outputs/plans/bundles_plan_<date>.csv by default.
 
@@ -211,16 +214,38 @@ def run_plan(
                      If None (default), each task uses its own bundle file from
                      outputs/bundles/{task}/bundles.parquet
         is_week_1: Whether this is Week 1 (special sampling: 30 DH, no D2DS)
-        official_start_date: Official experiment start date (YYYY-MM-DD).
-                            Only plans on or after this date are tracked for without-replacement.
-                            Plans before this date (e.g., pilot) are ignored.
-                            Default: "2026-01-10"
     """
     root, _, out_root = paths()
     rng = np.random.default_rng(int(seed))
 
+    # ============================================================================
+    # Determine experiment phase based on date
+    # ============================================================================
+    current_date = datetime.strptime(date, "%Y-%m-%d")
+
+    # Define phase date ranges
+    pilot_start = datetime.strptime("2025-12-27", "%Y-%m-%d")
+    pilot_end = datetime.strptime("2026-01-03", "%Y-%m-%d")
+    official_start = datetime.strptime("2026-01-10", "%Y-%m-%d")
+
+    if pilot_start <= current_date <= pilot_end:
+        experiment_phase = "pilot"
+        phase_min_date = "2025-12-27"
+        phase_max_date = "2026-01-03"
+    elif current_date >= official_start:
+        experiment_phase = "official"
+        phase_min_date = "2026-01-10"
+        phase_max_date = None  # No upper limit for official
+    else:
+        raise ValueError(
+            f"Date {date} is not in a valid experiment phase. "
+            f"Valid ranges: Pilot (2025-12-27 to 2026-01-03), Official (2026-01-10+)"
+        )
+
     print(f"\n{'='*70}")
     print(f"GENERATING PLAN FOR {date}")
+    print(f"Experiment Phase: {experiment_phase.upper()}")
+    print(f"Phase Date Range: {phase_min_date} to {phase_max_date or 'ongoing'}")
     print(f"{'='*70}")
 
     # Parse date and load latest pothole activities
@@ -233,11 +258,11 @@ def run_plan(
     # ============================================================================
     # BUNDLE TRACKING: Load historical bundle usage to ensure without-replacement
     # ============================================================================
-    print(f"\n[Bundle Tracking] Checking historical bundle usage...")
-    print(f"  Official experiment start: {official_start_date}")
-    print(f"  (Plans before this date are excluded from tracking)")
+    print(f"\n[Bundle Tracking] Checking historical bundle usage within {experiment_phase} phase...")
+    print(f"  Phase tracking range: {phase_min_date} to {phase_max_date or 'ongoing'}")
+    print(f"  (Only plans within this phase are tracked for without-replacement)")
     plan_dir = out_root / "plans"
-    used_tracker = get_used_bundles(plan_dir, exclude_date=date, min_date=official_start_date)
+    used_tracker = get_used_bundles(plan_dir, exclude_date=date, min_date=phase_min_date, max_date=phase_max_date)
 
     if used_tracker['all']:
         print_usage_summary(used_tracker)
@@ -513,15 +538,14 @@ def run_plan(
         print(f"\n[D2DS Sampling] Selecting D2DS bundles...")
 
         # CRITICAL: D2DS conditional bundles should come from PREVIOUS week's DH conditional
-        # NOT from current week's DH conditional!
-        # NOTE: Don't use min_date filter here - we need to include pilot plans too!
-        # For example, Jan 3 (Week 2 of pilot) needs Dec 27 (Week 1 of pilot) conditional bundles
+        # Must be from the SAME experiment phase (pilot or official)
         prev_week_conditional = get_previous_week_conditional_bundles(
             plan_dir=plan_dir,
             current_date=date,
             activities_df=activities,
             bundles_df=g_dh,
-            min_date=None  # Include all historical plans, including pilot
+            min_date=phase_min_date,  # Only look within current phase
+            max_date=phase_max_date   # Ensure we stay within phase
         )
 
         # Update available bundles (exclude already used DH bundles)
