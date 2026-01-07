@@ -241,11 +241,18 @@ def _generate_segment_analysis(routes: pd.DataFrame, date: str, out_dir: Path, r
             'bundle_pothole_count_excl_segment'
         ]
 
-        # Write to CSV
+        # Write to CSV in daily output directory
         output_file = out_dir / "segment_analysis.csv"
         analysis[output_cols].to_csv(output_file, index=False)
 
+        # Also save to routing folder
+        routing_dir = root / "outputs" / "routing" / "segment_analysis" / date
+        routing_dir.mkdir(parents=True, exist_ok=True)
+        routing_file = routing_dir / "segment_analysis.csv"
+        analysis[output_cols].to_csv(routing_file, index=False)
+
         print(f"[emit] Wrote segment analysis to {output_file}")
+        print(f"[emit] Wrote segment analysis to {routing_file}")
         print(f"[emit]   {len(analysis)} segments analyzed")
         print(f"[emit]   {analysis['has_pothole'].sum()} segments with potholes")
 

@@ -1,0 +1,7 @@
+category,bundles,segments,addresses,pct_of_bundles,pct_of_segments,pct_of_addresses
+DH only,28,214,2285,1.7,1.7,1.7
+D2DS only,4,30,340,0.2,0.2,0.3
+Both DH & D2DS,8,63,648,0.5,0.5,0.5
+DH full,,69,664,,0.6,0.5
+DH partial,,71,768,,0.6,0.6
+Total (used),40,307,3273,2.5,2.5,2.4

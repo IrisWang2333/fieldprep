@@ -1,0 +1,4 @@
+week,date,dh_bundles,d2ds_bundles,dh_addresses,d2ds_addresses,total_addresses,cumulative_dh,cumulative_d2ds,cumulative_total
+1,2025-01-06,24,0,1961,0,1961,1961,0,1961
+2,2025-01-13,6,6,477,506,983,2438,506,2944
+3,2025-01-20,6,6,495,482,977,2933,988,3921
