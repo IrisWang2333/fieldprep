@@ -445,8 +445,15 @@ def run_plan(
             max_travel_time = max(max_travel_time, travel_time)
         print(f"  Maximum travel time: {max_travel_time:.2f} km")
 
+        # Create name-to-code mapping (assignments returns real names, but we need codes A-F)
+        from sd311_fieldprep.assign_bundles_minimax import get_interviewers_for_date
+        real_names = get_interviewers_for_date(date)
+        name_to_code = {real_names[i]: interviewers[i] for i in range(len(interviewers))}
+
         # Create rows from optimized assignments
         for interviewer_name, (bundle_ids, _) in dh_assignments.items():
+            # Map real name back to code (A-F)
+            interviewer_code = name_to_code.get(interviewer_name, interviewer_name)
             for bundle_id in bundle_ids:
                 # Get bundle details
                 bundle_row = dh_details[dh_details['bundle_id'] == bundle_id]
@@ -459,7 +466,7 @@ def run_plan(
 
                 rows.append({
                     "date": date,
-                    "interviewer": interviewer_name,
+                    "interviewer": interviewer_code,
                     "task": "DH",
                     "bundle_id": int(bundle_id),
                     "list_code": int(list_code),
@@ -579,8 +586,15 @@ def run_plan(
                 max_travel_time_d2ds = max(max_travel_time_d2ds, travel_time)
             print(f"  Maximum travel time: {max_travel_time_d2ds:.2f} km")
 
+            # Create name-to-code mapping (assignments returns real names, but we need codes A-F)
+            from sd311_fieldprep.assign_bundles_minimax import get_interviewers_for_date
+            real_names_d2ds = get_interviewers_for_date(date)
+            name_to_code_d2ds = {real_names_d2ds[i]: interviewers[i] for i in range(len(interviewers))}
+
             # Create rows from optimized assignments
             for interviewer_name, (bundle_ids, _) in d2ds_assignments.items():
+                # Map real name back to code (A-F)
+                interviewer_code = name_to_code_d2ds.get(interviewer_name, interviewer_name)
                 for bundle_id in bundle_ids:
                     # Get bundle details (from either d2ds_conditional or d2ds_random)
                     if bundle_id in d2ds_conditional:
@@ -597,7 +611,7 @@ def run_plan(
 
                     rows.append({
                         "date": date,
-                        "interviewer": interviewer_name,
+                        "interviewer": interviewer_code,
                         "task": "D2DS",
                         "bundle_id": int(bundle_id),
                         "list_code": int(list_code),
