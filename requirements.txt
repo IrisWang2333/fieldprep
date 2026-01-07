@@ -22,6 +22,7 @@ requests>=2.31.0
 # Statistical analysis
 scipy>=1.10.0
 statsmodels>=0.14.0
+scikit-learn>=1.3.0
 
 # Plotting (optional, for visualization)
 matplotlib>=3.7.0
