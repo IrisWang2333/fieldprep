@@ -38,9 +38,9 @@ from utils.bundle_tracker import (
     print_usage_summary
 )
 
-# Import optimized assignment (minimax + local search)
-from sd311_fieldprep.assign_bundles_optimized import (
-    assign_bundles_for_date_optimized
+# Import clustered assignment (spatial clustering for geographic bundle grouping)
+from sd311_fieldprep.assign_bundles_clustered import (
+    assign_bundles_for_date_clustered
 )
 from sd311_fieldprep.assign_bundles_minimax import (
     get_interviewers_for_date
@@ -445,18 +445,18 @@ def run_plan(
     dh_details = all_candidates[all_candidates['bundle_id'].isin(sampled_dh_bundles)].copy()
 
     # ============================================================================
-    # Optimize bundle-to-interviewer assignment based on distance
+    # Optimize bundle-to-interviewer assignment using spatial clustering
     # ============================================================================
-    print(f"\n[Assignment Optimization] Assigning DH bundles to interviewers based on distance...")
+    print(f"\n[Assignment Optimization] Assigning DH bundles to interviewers using spatial clustering...")
 
     try:
         # Calculate bundles per interviewer
         bundles_per_interviewer = len(sampled_dh_bundles) // len(interviewers)
 
-        # Use optimized assignment (greedy minimax + local search)
+        # Use clustered assignment (k-means clustering for geographic grouping)
         geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-        dh_assignments = assign_bundles_for_date_optimized(
+        dh_assignments = assign_bundles_for_date_clustered(
             date=date,
             bundles=list(sampled_dh_bundles),
             bundles_gdf=g_dh,
@@ -464,7 +464,7 @@ def run_plan(
             bundles_per_interviewer=bundles_per_interviewer
         )
 
-        print(f"[Assignment Optimization] Successfully optimized DH assignments")
+        print(f"[Assignment Optimization] Successfully assigned DH bundles using clustering")
 
         # Print travel time summary
         max_travel_time = 0
@@ -584,18 +584,18 @@ def run_plan(
         d2ds_details = all_candidates[all_candidates['bundle_id'].isin(sampled_d2ds_bundles)].copy()
 
         # ============================================================================
-        # Optimize D2DS bundle-to-interviewer assignment based on distance
+        # Optimize D2DS bundle-to-interviewer assignment using spatial clustering
         # ============================================================================
-        print(f"\n[Assignment Optimization] Assigning D2DS bundles to interviewers based on distance...")
+        print(f"\n[Assignment Optimization] Assigning D2DS bundles to interviewers using spatial clustering...")
 
         try:
             # Calculate bundles per interviewer
             bundles_per_interviewer_d2ds = len(sampled_d2ds_bundles) // len(interviewers)
 
-            # Use optimized assignment (greedy minimax + local search)
+            # Use clustered assignment (k-means clustering for geographic grouping)
             geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-            d2ds_assignments = assign_bundles_for_date_optimized(
+            d2ds_assignments = assign_bundles_for_date_clustered(
                 date=date,
                 bundles=list(sampled_d2ds_bundles),
                 bundles_gdf=g_dh,
@@ -603,7 +603,7 @@ def run_plan(
                 bundles_per_interviewer=bundles_per_interviewer_d2ds
             )
 
-            print(f"[Assignment Optimization] Successfully optimized D2DS assignments")
+            print(f"[Assignment Optimization] Successfully assigned D2DS bundles using clustering")
 
             # Print travel time summary
             max_travel_time_d2ds = 0
