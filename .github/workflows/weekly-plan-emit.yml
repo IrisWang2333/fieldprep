@@ -19,11 +19,6 @@ on:
         required: false
         type: boolean
         default: true
-      official_start_date:
-        description: 'Official experiment start date (YYYY-MM-DD). For pilot use 2025-12-27, for official use 2026-01-10'
-        required: false
-        type: string
-        default: '2026-01-10'
 
 env:
   PYTHON_VERSION: '3.11'
@@ -84,19 +79,14 @@ jobs:
         run: |
           DATE="${{ steps.date.outputs.next_saturday }}"
           IS_WEEK_1="${{ inputs.is_week_1 }}"
-          OFFICIAL_START="${{ inputs.official_start_date }}"
 
           # Default to true if not set (for scheduled runs)
           if [ -z "$IS_WEEK_1" ]; then
             IS_WEEK_1="true"
           fi
 
-          # Default official_start_date if not set
-          if [ -z "$OFFICIAL_START" ]; then
-            OFFICIAL_START="2026-01-10"
-          fi
-
-          echo "Generating plan for $DATE (is_week_1=$IS_WEEK_1, official_start=$OFFICIAL_START)..."
+          echo "Generating plan for $DATE (is_week_1=$IS_WEEK_1)..."
+          echo "Note: Experiment phase (pilot/official) will be auto-detected based on date"
 
           # Run plan.py
           python -c "
@@ -106,9 +96,8 @@ jobs:
 
           date = '$DATE'
           is_week_1 = '$IS_WEEK_1' == 'true'
-          official_start_date = '$OFFICIAL_START'
 
-          print(f'Running plan for {date} (is_week_1={is_week_1}, official_start={official_start_date})...')
+          print(f'Running plan for {date} (is_week_1={is_week_1})...')
 
           plan_csv = run_plan(
               date=date,
@@ -117,8 +106,7 @@ jobs:
               list_code=30,
               seed=42,
               bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet',
-              is_week_1=is_week_1,
-              official_start_date=official_start_date
+              is_week_1=is_week_1
           )
           print(f'Plan created: {plan_csv}')
           " | tee plan_output.log
