@@ -38,9 +38,12 @@ from utils.bundle_tracker import (
     print_usage_summary
 )
 
-# Import minimax assignment (minimizes maximum travel time)
+# Import optimized assignment (minimax + local search)
+from sd311_fieldprep.assign_bundles_optimized import (
+    assign_bundles_for_date_optimized
+)
 from sd311_fieldprep.assign_bundles_minimax import (
-    assign_bundles_for_date_minimax
+    get_interviewers_for_date
 )
 
 
@@ -450,10 +453,10 @@ def run_plan(
         # Calculate bundles per interviewer
         bundles_per_interviewer = len(sampled_dh_bundles) // len(interviewers)
 
-        # Use minimax assignment (minimize maximum travel time)
+        # Use optimized assignment (greedy minimax + local search)
         geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-        dh_assignments = assign_bundles_for_date_minimax(
+        dh_assignments = assign_bundles_for_date_optimized(
             date=date,
             bundles=list(sampled_dh_bundles),
             bundles_gdf=g_dh,
@@ -461,7 +464,7 @@ def run_plan(
             bundles_per_interviewer=bundles_per_interviewer
         )
 
-        print(f"[Assignment Optimization] Successfully optimized DH assignments (minimax)")
+        print(f"[Assignment Optimization] Successfully optimized DH assignments")
 
         # Print travel time summary
         max_travel_time = 0
@@ -471,7 +474,6 @@ def run_plan(
         print(f"  Maximum travel time: {max_travel_time:.2f} km")
 
         # Create name-to-code mapping (assignments returns real names, but we need codes A-F)
-        from sd311_fieldprep.assign_bundles_minimax import get_interviewers_for_date
         real_names = get_interviewers_for_date(date)
         name_to_code = {real_names[i]: interviewers[i] for i in range(len(interviewers))}
 
@@ -590,10 +592,10 @@ def run_plan(
             # Calculate bundles per interviewer
             bundles_per_interviewer_d2ds = len(sampled_d2ds_bundles) // len(interviewers)
 
-            # Use minimax assignment (minimize maximum travel time)
+            # Use optimized assignment (greedy minimax + local search)
             geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-            d2ds_assignments = assign_bundles_for_date_minimax(
+            d2ds_assignments = assign_bundles_for_date_optimized(
                 date=date,
                 bundles=list(sampled_d2ds_bundles),
                 bundles_gdf=g_dh,
@@ -601,7 +603,7 @@ def run_plan(
                 bundles_per_interviewer=bundles_per_interviewer_d2ds
             )
 
-            print(f"[Assignment Optimization] Successfully optimized D2DS assignments (minimax)")
+            print(f"[Assignment Optimization] Successfully optimized D2DS assignments")
 
             # Print travel time summary
             max_travel_time_d2ds = 0
@@ -611,7 +613,6 @@ def run_plan(
             print(f"  Maximum travel time: {max_travel_time_d2ds:.2f} km")
 
             # Create name-to-code mapping (assignments returns real names, but we need codes A-F)
-            from sd311_fieldprep.assign_bundles_minimax import get_interviewers_for_date
             real_names_d2ds = get_interviewers_for_date(date)
             name_to_code_d2ds = {real_names_d2ds[i]: interviewers[i] for i in range(len(interviewers))}
 
