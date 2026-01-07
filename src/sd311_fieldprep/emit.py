@@ -133,6 +133,128 @@ def _stable_seed_segment(date_str: str, interviewer: str, seg_id: str | int) -> 
     return int(hashlib.sha256(s.encode()).hexdigest()[:16], 16) % (2**32 - 1)
 
 
+def _generate_segment_analysis(routes: pd.DataFrame, date: str, out_dir: Path, root: Path):
+    """
+    Generate comprehensive segment-level analysis CSV with pothole metrics.
+
+    Outputs segment_analysis.csv with columns:
+    - segment_id
+    - bundle_id
+    - date
+    - treatment_status_dh (DH/empty)
+    - survey_status_d2ds (D2DS/empty)
+    - has_pothole (1/0)
+    - pothole_count (number of potholes in segment)
+    - share_fixed_potholes (0-1, share of potholes fixed)
+    - avg_days_to_fix (average days to fix potholes in segment)
+    - max_days_to_status_change (max days until status change in segment)
+    - bundle_pothole_count_excl_segment (potholes in bundle excluding this segment)
+    """
+    print(f"[emit] Generating segment-level analysis...")
+
+    # Load pothole simulation data
+    pothole_file = root / "outputs" / "pothole_model" / "pothole_simulation_2026.parquet"
+    if not pothole_file.exists():
+        print(f"[emit][WARN] Pothole simulation file not found: {pothole_file}")
+        print(f"[emit][WARN] Skipping segment analysis generation")
+        return
+
+    try:
+        potholes = pd.read_parquet(pothole_file)
+
+        # Convert date to week_start format for matching
+        date_obj = pd.to_datetime(date)
+
+        # Get pothole data for the relevant week
+        potholes['week_start'] = pd.to_datetime(potholes['week_start'])
+        week_potholes = potholes[potholes['week_start'] == date_obj].copy()
+
+        if week_potholes.empty:
+            print(f"[emit][WARN] No pothole data found for date {date}")
+            # Try to find the nearest week
+            potholes['date_diff'] = abs((potholes['week_start'] - date_obj).dt.days)
+            nearest_week = potholes.loc[potholes['date_diff'].idxmin()]
+            print(f"[emit][WARN] Using nearest week: {nearest_week['week_start']}")
+            week_potholes = potholes[potholes['week_start'] == nearest_week['week_start']].copy()
+
+        # Calculate segment-level metrics
+        seg_metrics = week_potholes.groupby('segment_id').agg({
+            'y_sim': ['sum', 'count'],  # Total potholes, count of records
+            'r_sim': lambda x: x.notna().sum() / len(x) if len(x) > 0 else 0,  # Share fixed
+        }).reset_index()
+
+        seg_metrics.columns = ['segment_id', 'pothole_count', 'record_count', 'share_fixed_potholes']
+        seg_metrics['has_pothole'] = (seg_metrics['pothole_count'] > 0).astype(int)
+
+        # Calculate avg time to fix (days) and max time to status change
+        # For now, using placeholder values as we need time-series data
+        seg_metrics['avg_days_to_fix'] = 0
+        seg_metrics['max_days_to_status_change'] = 0
+
+        # Merge with routes to get bundle_id and task info
+        routes_seg = routes[['segment_id', 'bundle_id', 'task', 'date']].drop_duplicates()
+
+        # Create DH and D2DS status columns
+        routes_seg['treatment_status_dh'] = ''
+        routes_seg['survey_status_d2ds'] = ''
+
+        dh_mask = routes_seg['task'].str.upper() == 'DH'
+        d2ds_mask = routes_seg['task'].str.upper() == 'D2DS'
+
+        routes_seg.loc[dh_mask, 'treatment_status_dh'] = 'DH'
+        routes_seg.loc[d2ds_mask, 'survey_status_d2ds'] = 'D2DS'
+
+        # Merge routes with pothole metrics
+        analysis = routes_seg.merge(
+            seg_metrics[['segment_id', 'has_pothole', 'pothole_count',
+                        'share_fixed_potholes', 'avg_days_to_fix',
+                        'max_days_to_status_change']],
+            on='segment_id',
+            how='left'
+        )
+
+        # Fill NaN values for segments without potholes
+        analysis['has_pothole'] = analysis['has_pothole'].fillna(0).astype(int)
+        analysis['pothole_count'] = analysis['pothole_count'].fillna(0).astype(int)
+        analysis['share_fixed_potholes'] = analysis['share_fixed_potholes'].fillna(0)
+        analysis['avg_days_to_fix'] = analysis['avg_days_to_fix'].fillna(0)
+        analysis['max_days_to_status_change'] = analysis['max_days_to_status_change'].fillna(0)
+
+        # Calculate bundle-level pothole count excluding each segment
+        bundle_totals = analysis.groupby('bundle_id')['pothole_count'].sum().to_dict()
+        analysis['bundle_pothole_count_excl_segment'] = (
+            analysis['bundle_id'].map(bundle_totals) - analysis['pothole_count']
+        )
+
+        # Select final columns
+        output_cols = [
+            'segment_id',
+            'bundle_id',
+            'date',
+            'treatment_status_dh',
+            'survey_status_d2ds',
+            'has_pothole',
+            'pothole_count',
+            'share_fixed_potholes',
+            'avg_days_to_fix',
+            'max_days_to_status_change',
+            'bundle_pothole_count_excl_segment'
+        ]
+
+        # Write to CSV
+        output_file = out_dir / "segment_analysis.csv"
+        analysis[output_cols].to_csv(output_file, index=False)
+
+        print(f"[emit] Wrote segment analysis to {output_file}")
+        print(f"[emit]   {len(analysis)} segments analyzed")
+        print(f"[emit]   {analysis['has_pothole'].sum()} segments with potholes")
+
+    except Exception as e:
+        print(f"[emit][ERROR] Failed to generate segment analysis: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 def run_emit(date: str, plan_csv: str, bundle_file: str | None = None, addr_assignment_file: str | None = None):
     """
     Generate daily work files (routes, segments, addresses) from a plan.
@@ -492,5 +614,8 @@ def run_emit(date: str, plan_csv: str, bundle_file: str | None = None, addr_assi
     )
     starts = starts.merge(addr_rep, on=["interviewer","task"], how="left")
     starts.to_csv(out_dir / "starts.csv", index=False)
+
+    # ---- Generate segment-level comprehensive CSV ----
+    _generate_segment_analysis(routes, date, out_dir, root)
 
     print(f"[emit] wrote {out_dir}")
