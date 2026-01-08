@@ -553,7 +553,14 @@ def run_plan(
         # Update available bundles (exclude already used DH bundles)
         all_available_for_d2ds = all_bundle_ids - set(sampled_dh_bundles)
 
+        # For random D2DS, use bundles that had potholes in last week
+        # (same eligibility as current week's conditional pool)
+        eligible_for_d2ds_random = eligible_bundle_ids_filtered & all_available_for_d2ds
+
+        print(f"  Eligible bundles for D2DS random (had potholes last week): {len(eligible_for_d2ds_random)}")
+
         # Use select_d2ds_bundles utility with PREVIOUS week's conditional bundles
+        # and eligible bundles as random pool
         d2ds_selection = select_d2ds_bundles(
             conditional_bundles=prev_week_conditional,
             all_bundles=all_available_for_d2ds,
@@ -561,7 +568,8 @@ def run_plan(
             n_from_conditional=4,
             n_random=2,
             seed=rng.integers(0, 1e9),
-            segment_col='segment_id'
+            segment_col='segment_id',
+            eligible_bundles=eligible_for_d2ds_random  # Random D2DS conditional on last week potholes
         )
 
         sampled_d2ds_bundles = d2ds_selection['d2ds_all']
