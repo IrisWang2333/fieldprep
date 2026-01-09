@@ -1,0 +1,72 @@
+name: Daily Assignment Emails
+
+on:
+  schedule:
+    # Run every day at 6:00 AM Pacific Time (14:00 UTC in standard time)
+    # Note: GitHub Actions uses UTC time
+    - cron: '0 14 * * *'
+
+  workflow_dispatch:
+    # Allow manual triggering for testing
+    inputs:
+      date:
+        description: 'Date to send emails for (YYYY-MM-DD). Leave empty for today.'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run (print emails without sending)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  send-emails:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pandas requests google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: Create OAuth credentials file
+        run: |
+          echo '${{ secrets.GMAIL_OAUTH_CREDENTIALS }}' > client_secret.json
+
+      - name: Create OAuth token file
+        run: |
+          echo '${{ secrets.GMAIL_OAUTH_TOKEN }}' > token.json
+
+      - name: Send assignment emails
+        run: |
+          if [ -n "${{ inputs.date }}" ]; then
+            DATE_ARG="--date ${{ inputs.date }}"
+          else
+            DATE_ARG=""
+          fi
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_ARG="--dry-run"
+          else
+            DRY_RUN_ARG=""
+          fi
+
+          python send_assignments.py $DATE_ARG $DRY_RUN_ARG
+
+      - name: Upload logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: email-logs
+          path: |
+            *.log
+            *.txt
+          retention-days: 7

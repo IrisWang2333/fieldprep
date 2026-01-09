@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Send CaminoLabs task emails to today's four interviewers (A–D),
-driven by a Google Sheet ("Daily Assignments" + "Email Addresses")
+Send CaminoLabs task emails to today's six interviewers (A–F),
+driven by a Google Sheet ("Daily Assignments" + "interviewers")
 and a local starts.csv (long format with columns: date, interviewer, task, address).
 
 Default behavior (no flags):
@@ -49,11 +49,11 @@ SCOPES = [
 ]
 
 # ---- Defaults ----
-DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/15w-0gLUGNW-vbP0N7ZUBqjLgd1-U8_2yAif5kYhJ0C4/edit?usp=sharing"
-DEFAULT_BASE_DIR = "/Users/dschonho/Dropbox/Research/SanDiego311/code/fieldprep/outputs/incoming/daily"
+DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1IFb5AF2VEd9iMK69B4GFlYovVOM-7_TxIo6MrsJ-6X0/edit?gid=0#gid=0"
+DEFAULT_BASE_DIR = "/Users/iris/Dropbox/sandiego code/code/fieldprep/outputs/incoming/daily"
 DEFAULT_SENDER   = "dschonho@usc.edu"
 
-ROLES = ["A", "B", "C", "D"]
+ROLES = ["A", "B", "C", "D", "E", "F"]
 SUPERVISOR_NAMES = {"vickie", "carlie", "yifei"}  # case-insensitive
 
 # ---- Helpers ----
@@ -180,7 +180,7 @@ def send_email(gmail_service, sender: str, to: str, subject: str, body_html: str
     ).execute()
 
 def main():
-    parser = argparse.ArgumentParser(description="Send CaminoLabs task emails to interviewers A–D for a given date.")
+    parser = argparse.ArgumentParser(description="Send CaminoLabs task emails to interviewers A–F for a given date.")
     parser.add_argument("--sheet", default=DEFAULT_SHEET_URL, help="Google Sheet URL or spreadsheet ID.")
     parser.add_argument("--date", default=None, help="Date to use (YYYY-MM-DD). Defaults to today (local).")
     parser.add_argument("--sender", default=DEFAULT_SENDER, help="Sender Gmail account (default: dschonho@usc.edu).")
@@ -211,13 +211,13 @@ def main():
     # Read sheets
     ssid = extract_spreadsheet_id(args.sheet)
     daily_df = read_sheet_as_dataframe(sheets_service, ssid, "Daily Assignments!A:Z")
-    emails_df = read_sheet_as_dataframe(sheets_service, ssid, "Email Addresses!A:B")
+    emails_df = read_sheet_as_dataframe(sheets_service, ssid, "interviewers!A:B")
 
     if daily_df.empty:
         print("ERROR: 'Daily Assignments' is empty or not found.")
         sys.exit(1)
     if emails_df.empty or not set(["Name", "Email"]).issubset(set(emails_df.columns)):
-        print("ERROR: 'Email Addresses' is empty or missing Name/Email columns.")
+        print("ERROR: 'interviewers' tab is empty or missing Name/Email columns.")
         sys.exit(1)
 
     row = pick_today_row(daily_df, target_date)
