@@ -325,30 +325,33 @@ def assign_bundles_for_date_minimax(
     date: str,
     bundles: List[int],
     bundles_gdf: gpd.GeoDataFrame,
-    geocoded_file: str,
-    bundles_per_interviewer: int = 4
+    geocoded_file: str | None = None,
+    bundles_per_interviewer: int = 4,
+    sheet_id: str = '1IFb5AF2VEd9iMK69B4GFlYovVOM-7_TxIo6MrsJ-6X0'
 ) -> Dict[str, Tuple[List[int], float]]:
     """
     Assign bundles to interviewers using minimax optimization.
 
+    Args:
+        date: Target date
+        bundles: List of bundle IDs to assign
+        bundles_gdf: GeoDataFrame with bundle geometries
+        geocoded_file: DEPRECATED - kept for backward compatibility, not used
+        bundles_per_interviewer: Target bundles per interviewer
+        sheet_id: Google Sheets ID for interviewer data
+
     Returns:
         Dict mapping interviewer name to (ordered_bundle_list, total_travel_time)
     """
-    # Get interviewers for this date
-    interviewer_names = get_interviewers_for_date(date)
+    # Load interviewers from Google Sheet with geocoding
+    from sd311_fieldprep.interviewer_geocoding import get_interviewers_for_date_with_locations
 
-    # Load geocoded data
-    all_interviewers_df = load_interviewer_data(geocoded_file)
+    interviewers = get_interviewers_for_date_with_locations(
+        date=date,
+        sheet_id=sheet_id
+    )
 
-    # Filter to assigned interviewers
-    assigned_interviewers = all_interviewers_df[
-        all_interviewers_df['name'].isin(interviewer_names)
-    ].copy()
-
-    assigned_interviewers = assigned_interviewers.dropna(subset=['lat', 'lon'])
-
-    # Convert to list of dicts
-    interviewers = assigned_interviewers[['name', 'email', 'lat', 'lon']].to_dict('records')
+    print(f"[Minimax Assignment] Loaded {len(interviewers)} interviewers for {date}")
 
     # Assign with minimax
     return assign_bundles_minimax(

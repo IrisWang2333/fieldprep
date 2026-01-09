@@ -1,0 +1,43 @@
+{
+  "330 5th ave, chula vista, ca 91910": {
+    "lat": 32.6377159,
+    "lon": -117.0880279,
+    "address": "330 5th Ave, Chula Vista, CA 91910"
+  },
+  "3454 del sol blvd, san diego, ca 92154": {
+    "lat": 32.5734456,
+    "lon": -117.0601682,
+    "address": "3454 Del Sol Blvd, San Diego, CA 92154"
+  },
+  "270 c street, chula vista, ca 90910": {
+    "lat": 32.651724,
+    "lon": -117.082517,
+    "address": "270 C Street, Chula Vista, CA 90910"
+  },
+  "202 island ave, san diego, ca 92101": {
+    "lat": 32.7107156,
+    "lon": -117.1623096,
+    "address": "202 Island Ave, San Diego, CA 92101"
+  },
+  "275 ballantyne st, el cajon, ca 92020": {
+    "lat": 32.797258,
+    "lon": -116.956691,
+    "address": "275 Ballantyne St, El Cajon, CA 92020"
+  },
+  "8650 lake ashmere dr, san diego, ca 92119": {
+    "lat": 32.7997809,
+    "lon": -117.0102621,
+    "address": "8650 Lake Ashmere Dr, San Diego, CA 92119"
+  },
+  "1250 5th ave, chula vista, ca 91911": {
+    "lat": 32.60593,
+    "lon": -117.076313,
+    "address": "1250 5th Ave, Chula Vista, CA 91911"
+  },
+  "2944 baker pl, national city, ca 91950": {
+    "lat": 32.6702,
+    "lon": -117.053,
+    "address": "2944 Baker Pl, National City, CA 91950",
+    "source": "manual_from_google_maps"
+  }
+}

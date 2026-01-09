@@ -38,9 +38,9 @@ from utils.bundle_tracker import (
     print_usage_summary
 )
 
-# Import clustered assignment (spatial clustering for geographic bundle grouping)
-from sd311_fieldprep.assign_bundles_clustered import (
-    assign_bundles_for_date_clustered
+# Import interviewer-aware bisection (optimized spatial clustering)
+from sd311_fieldprep.assign_bundles_bisection_aware import (
+    assign_bundles_for_date_bisection_aware
 )
 from sd311_fieldprep.assign_bundles_minimax import (
     get_interviewers_for_date
@@ -327,6 +327,16 @@ def run_plan(
 
     # Get eligible bundles (had pothole in preceding week)
     print(f"\n[Eligibility Check] Determining eligible bundles based on preceding week...")
+
+    # Calculate and display the actual date range being used
+    from utils.sampling import get_week_start
+    current_week_start = get_week_start(pd.Timestamp(current_date))
+    preceding_week_start = current_week_start - timedelta(days=7)
+    preceding_week_end = current_week_start - timedelta(days=1)
+    print(f"  Current date: {date}")
+    print(f"  Current week start (Saturday): {current_week_start.date()}")
+    print(f"  Preceding week range: {preceding_week_start.date()} to {preceding_week_end.date()}")
+
     eligible_bundle_ids = get_eligible_bundles_for_date(
         current_date=current_date,
         activities_df=activities,
@@ -446,26 +456,27 @@ def run_plan(
     dh_details = all_candidates[all_candidates['bundle_id'].isin(sampled_dh_bundles)].copy()
 
     # ============================================================================
-    # Optimize bundle-to-interviewer assignment using spatial clustering
+    # Optimize bundle-to-interviewer assignment using interviewer-aware bisection
     # ============================================================================
-    print(f"\n[Assignment Optimization] Assigning DH bundles to interviewers using spatial clustering...")
+    print(f"\n[Assignment Optimization] Assigning DH bundles to interviewers using interviewer-aware bisection...")
 
     try:
         # Calculate bundles per interviewer
         bundles_per_interviewer = len(sampled_dh_bundles) // len(interviewers)
 
-        # Use clustered assignment (k-means clustering for geographic grouping)
+        # Use interviewer-aware bisection (alpha=0.0: only consider interviewer proximity)
         geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-        dh_assignments = assign_bundles_for_date_clustered(
+        dh_assignments = assign_bundles_for_date_bisection_aware(
             date=date,
             bundles=list(sampled_dh_bundles),
             bundles_gdf=g_dh,
             geocoded_file=str(geocoded_file) if geocoded_file.exists() else None,
-            bundles_per_interviewer=bundles_per_interviewer
+            bundles_per_interviewer=bundles_per_interviewer,
+            alpha=0.0  # Only consider interviewer proximity (16.5% better than K-means)
         )
 
-        print(f"[Assignment Optimization] Successfully assigned DH bundles using clustering")
+        print(f"[Assignment Optimization] Successfully assigned DH bundles using interviewer-aware bisection")
 
         # Print travel time summary
         max_travel_time = 0
@@ -554,11 +565,13 @@ def run_plan(
         # Update available bundles (exclude already used DH bundles)
         all_available_for_d2ds = all_bundle_ids - set(sampled_dh_bundles)
 
-        # For random D2DS, use bundles that had potholes in last week
-        # (same eligibility as current week's conditional pool)
+        # For random D2DS, use bundles that had potholes in the ACTUAL previous field work week
+        # For Jan 3 (Week 2), this should be Dec 27 - Jan 2 (when Dec 27's DH work happened)
+        # This is the same as the "preceding week" of the current date
+        print(f"  D2DS random sampling uses bundles with potholes in: {preceding_week_start.date()} to {preceding_week_end.date()}")
         eligible_for_d2ds_random = eligible_bundle_ids_filtered & all_available_for_d2ds
 
-        print(f"  Eligible bundles for D2DS random (had potholes last week): {len(eligible_for_d2ds_random)}")
+        print(f"  Eligible bundles for D2DS random (had potholes in previous field work week): {len(eligible_for_d2ds_random)}")
 
         # Use select_d2ds_bundles utility with PREVIOUS week's conditional bundles
         # and eligible bundles as random pool
@@ -593,26 +606,27 @@ def run_plan(
         d2ds_details = all_candidates[all_candidates['bundle_id'].isin(sampled_d2ds_bundles)].copy()
 
         # ============================================================================
-        # Optimize D2DS bundle-to-interviewer assignment using spatial clustering
+        # Optimize D2DS bundle-to-interviewer assignment using interviewer-aware bisection
         # ============================================================================
-        print(f"\n[Assignment Optimization] Assigning D2DS bundles to interviewers using spatial clustering...")
+        print(f"\n[Assignment Optimization] Assigning D2DS bundles to interviewers using interviewer-aware bisection...")
 
         try:
             # Calculate bundles per interviewer
             bundles_per_interviewer_d2ds = len(sampled_d2ds_bundles) // len(interviewers)
 
-            # Use clustered assignment (k-means clustering for geographic grouping)
+            # Use interviewer-aware bisection (alpha=0.0: only consider interviewer proximity)
             geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-            d2ds_assignments = assign_bundles_for_date_clustered(
+            d2ds_assignments = assign_bundles_for_date_bisection_aware(
                 date=date,
                 bundles=list(sampled_d2ds_bundles),
                 bundles_gdf=g_dh,
                 geocoded_file=str(geocoded_file) if geocoded_file.exists() else None,
-                bundles_per_interviewer=bundles_per_interviewer_d2ds
+                bundles_per_interviewer=bundles_per_interviewer_d2ds,
+                alpha=0.0  # Only consider interviewer proximity (16.5% better than K-means)
             )
 
-            print(f"[Assignment Optimization] Successfully assigned D2DS bundles using clustering")
+            print(f"[Assignment Optimization] Successfully assigned D2DS bundles using interviewer-aware bisection")
 
             # Print travel time summary
             max_travel_time_d2ds = 0
