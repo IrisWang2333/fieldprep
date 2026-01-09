@@ -188,6 +188,7 @@ def main():
     parser.add_argument("--credentials", default="client_secret.json", help="OAuth client_secret file path.")
     parser.add_argument("--token", default="token.json", help="OAuth token cache file path.")
     parser.add_argument("--dry-run", action="store_true", help="Print emails instead of sending.")
+    parser.add_argument("--test-mode", action="store_true", help="Add 【fake test】 to subject line for testing.")
     args = parser.parse_args()
 
     # Determine working date and paths
@@ -280,6 +281,8 @@ def main():
         d2ds_text = d2_row["address"].iloc[0] if not d2_row.empty and d2_row["address"].iloc[0] else "TBD"
 
         subject = f"CaminoLabs Tasks for {date_str}"
+        if args.test_mode:
+            subject = f"【fake test】{subject}"
         map_url = f"https://maps-deployment.pages.dev/{r}"
 
         weather_line = get_weather_summary()

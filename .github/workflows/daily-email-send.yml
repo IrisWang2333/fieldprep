@@ -18,6 +18,11 @@ on:
         required: false
         type: boolean
         default: false
+      test_mode:
+        description: 'Test mode (add 【fake test】 to subject)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   send-emails:
@@ -59,7 +64,13 @@ jobs:
             DRY_RUN_ARG=""
           fi
 
-          python send_assignments.py $DATE_ARG $DRY_RUN_ARG
+          if [ "${{ inputs.test_mode }}" = "true" ]; then
+            TEST_MODE_ARG="--test-mode"
+          else
+            TEST_MODE_ARG=""
+          fi
+
+          python send_assignments.py $DATE_ARG $DRY_RUN_ARG $TEST_MODE_ARG
 
       - name: Upload logs (on failure)
         if: failure()
