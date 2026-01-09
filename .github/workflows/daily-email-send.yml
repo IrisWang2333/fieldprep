@@ -53,7 +53,24 @@ jobs:
         run: |
           echo '${{ secrets.GMAIL_OAUTH_TOKEN }}' > token.json
 
+      - name: Check date range
+        id: check_date
+        run: |
+          # Only send emails from Jan 10, 2026 to Aug 8, 2026
+          TODAY=$(date -u +%Y-%m-%d)
+          START_DATE="2026-01-10"
+          END_DATE="2026-08-08"
+
+          if [[ "$TODAY" < "$START_DATE" ]] || [[ "$TODAY" > "$END_DATE" ]]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Date $TODAY is outside the valid range ($START_DATE to $END_DATE). Skipping email sending."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "Date $TODAY is within valid range. Proceeding with email sending."
+          fi
+
       - name: Send assignment emails
+        if: steps.check_date.outputs.skip != 'true'
         run: |
           if [ -n "${{ inputs.date }}" ]; then
             DATE_ARG="--date ${{ inputs.date }}"

@@ -4,18 +4,19 @@ This document explains how to set up automated daily email sending via GitHub Ac
 
 ## Overview
 
-The system automatically sends assignment emails to interviewers every day at **6:00 AM Pacific Time** starting from **January 10, 2026**.
+The system automatically sends assignment emails to interviewers **every Saturday at 6:00 AM Pacific Time** from **January 10, 2026** to **August 8, 2026**.
 
 ## How it Works
 
-1. **Scheduled Trigger**: GitHub Actions runs daily at 6:00 AM PT (14:00 UTC)
-2. **Data Source**: Reads from Google Sheet "Daily Assignments" tab for today's date
-3. **Email Content**:
+1. **Scheduled Trigger**: GitHub Actions runs every Saturday at 6:00 AM PT (14:00 UTC)
+2. **Date Range**: Only sends emails between Jan 10, 2026 and Aug 8, 2026
+3. **Data Source**: Reads from Google Sheet "Daily Assignments" tab for today's date
+4. **Email Content**:
    - DH and D2DS starting addresses from `outputs/incoming/daily/{date}/starts.csv`
    - San Diego weather forecast
    - Map URLs for each interviewer (A-F)
-4. **Recipients**: All 6 interviewers listed in the sheet
-5. **CC**: Supervisors (Carlie, Yifei) are automatically CC'd
+5. **Recipients**: All 6 interviewers listed in the sheet
+6. **CC**: Supervisors (Carlie, Yifei) are automatically CC'd
 
 ## Required GitHub Secrets
 
@@ -54,10 +55,11 @@ You can manually trigger the workflow from GitHub Actions:
 
 ## Schedule Details
 
-- **Cron**: `0 14 * * *` (UTC time)
+- **Cron**: `0 14 * * 6` (UTC time, 6 = Saturday)
 - **Local Time**: 6:00 AM Pacific (during standard time)
-- **Frequency**: Every day
-- **Start Date**: January 10, 2026
+- **Frequency**: Every Saturday
+- **Date Range**: January 10, 2026 - August 8, 2026
+- **Note**: After August 8, 2026, the workflow will continue to run but skip sending emails
 
 ## Google Sheet Structure
 
