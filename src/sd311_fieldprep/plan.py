@@ -38,9 +38,9 @@ from utils.bundle_tracker import (
     print_usage_summary
 )
 
-# Import interviewer-aware bisection (optimized spatial clustering)
-from sd311_fieldprep.assign_bundles_bisection_aware import (
-    assign_bundles_for_date_bisection_aware
+# Import nearest-then-refine (best performing algorithm: 53.6% better than baseline)
+from sd311_fieldprep.assign_bundles_nearest_then_refine import (
+    assign_bundles_for_date_nearest_then_refine
 )
 from sd311_fieldprep.assign_bundles_minimax import (
     get_interviewers_for_date
@@ -464,19 +464,19 @@ def run_plan(
         # Calculate bundles per interviewer
         bundles_per_interviewer = len(sampled_dh_bundles) // len(interviewers)
 
-        # Use interviewer-aware bisection (alpha=0.0: only consider interviewer proximity)
+        # Use nearest-then-refine (best algorithm: 53.6% better than baseline)
         geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-        dh_assignments = assign_bundles_for_date_bisection_aware(
+        dh_assignments = assign_bundles_for_date_nearest_then_refine(
             date=date,
             bundles=list(sampled_dh_bundles),
             bundles_gdf=g_dh,
             geocoded_file=str(geocoded_file) if geocoded_file.exists() else None,
             bundles_per_interviewer=bundles_per_interviewer,
-            alpha=0.0  # Only consider interviewer proximity (16.5% better than K-means)
+            max_refine_iterations=50  # Iterative refinement to minimize max travel distance
         )
 
-        print(f"[Assignment Optimization] Successfully assigned DH bundles using interviewer-aware bisection")
+        print(f"[Assignment Optimization] Successfully assigned DH bundles using nearest-then-refine")
 
         # Print travel time summary
         max_travel_time = 0
@@ -606,27 +606,27 @@ def run_plan(
         d2ds_details = all_candidates[all_candidates['bundle_id'].isin(sampled_d2ds_bundles)].copy()
 
         # ============================================================================
-        # Optimize D2DS bundle-to-interviewer assignment using interviewer-aware bisection
+        # Optimize D2DS bundle-to-interviewer assignment using nearest-then-refine
         # ============================================================================
-        print(f"\n[Assignment Optimization] Assigning D2DS bundles to interviewers using interviewer-aware bisection...")
+        print(f"\n[Assignment Optimization] Assigning D2DS bundles to interviewers using nearest-then-refine...")
 
         try:
             # Calculate bundles per interviewer
             bundles_per_interviewer_d2ds = len(sampled_d2ds_bundles) // len(interviewers)
 
-            # Use interviewer-aware bisection (alpha=0.0: only consider interviewer proximity)
+            # Use nearest-then-refine (best algorithm: 53.6% better than baseline)
             geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-            d2ds_assignments = assign_bundles_for_date_bisection_aware(
+            d2ds_assignments = assign_bundles_for_date_nearest_then_refine(
                 date=date,
                 bundles=list(sampled_d2ds_bundles),
                 bundles_gdf=g_dh,
                 geocoded_file=str(geocoded_file) if geocoded_file.exists() else None,
                 bundles_per_interviewer=bundles_per_interviewer_d2ds,
-                alpha=0.0  # Only consider interviewer proximity (16.5% better than K-means)
+                max_refine_iterations=50  # Iterative refinement to minimize max travel distance
             )
 
-            print(f"[Assignment Optimization] Successfully assigned D2DS bundles using interviewer-aware bisection")
+            print(f"[Assignment Optimization] Successfully assigned D2DS bundles using nearest-then-refine")
 
             # Print travel time summary
             max_travel_time_d2ds = 0
