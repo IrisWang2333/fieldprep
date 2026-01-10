@@ -57,7 +57,12 @@ jobs:
         id: check_date
         run: |
           # Only send emails from Jan 10, 2026 to Aug 8, 2026
-          TODAY=$(date -u +%Y-%m-%d)
+          if [ -n "${{ inputs.date }}" ]; then
+            TODAY="${{ inputs.date }}"
+          else
+            TODAY=$(date -u +%Y-%m-%d)
+          fi
+
           START_DATE="2026-01-10"
           END_DATE="2026-08-08"
 
@@ -67,7 +72,29 @@ jobs:
           else
             echo "skip=false" >> $GITHUB_OUTPUT
             echo "Date $TODAY is within valid range. Proceeding with email sending."
+            echo "target_date=$TODAY" >> $GITHUB_OUTPUT
           fi
+
+      - name: Download starts.csv from Google Drive
+        if: steps.check_date.outputs.skip != 'true'
+        env:
+          GOOGLE_DRIVE_OAUTH_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_OAUTH_CREDENTIALS }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: |
+          TARGET_DATE="${{ steps.check_date.outputs.target_date }}"
+          OUTPUT_DIR="outputs/incoming/daily"
+
+          echo "Downloading starts.csv for $TARGET_DATE from Google Drive..."
+          mkdir -p "$OUTPUT_DIR"
+
+          python scripts/download_from_drive.py \
+            "$GOOGLE_DRIVE_FOLDER_ID" \
+            "$TARGET_DATE" \
+            "$OUTPUT_DIR/$TARGET_DATE" \
+            --oauth-credentials "$GOOGLE_DRIVE_OAUTH_CREDENTIALS"
+
+          echo "✓ Downloaded files:"
+          ls -lh "$OUTPUT_DIR/$TARGET_DATE"
 
       - name: Send assignment emails
         if: steps.check_date.outputs.skip != 'true'
@@ -90,7 +117,8 @@ jobs:
             TEST_MODE_ARG=""
           fi
 
-          python send_assignments.py $DATE_ARG $DRY_RUN_ARG $TEST_MODE_ARG
+          # Use the downloaded files (relative path works in GitHub Actions)
+          python send_assignments.py $DATE_ARG $DRY_RUN_ARG $TEST_MODE_ARG --base "outputs/incoming/daily"
 
       - name: Upload logs (on failure)
         if: failure()
