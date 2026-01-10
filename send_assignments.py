@@ -273,8 +273,8 @@ def main():
             print(f"WARNING: No email found for '{name}' in 'Email Addresses'; skipping {r}.")
             continue
 
-        # Filter starts for this date and interviewer NAME (not role code)
-        s_slice = starts_df[(starts_df["date"] == date_str) & (starts_df["interviewer"] == name)]
+        # Filter starts for this date and role code (starts.csv uses A-F, not names)
+        s_slice = starts_df[(starts_df["date"] == date_str) & (starts_df["interviewer"] == r)]
         dh_row = s_slice[s_slice["task"] == "DH"].head(1)
         d2_row = s_slice[s_slice["task"].isin(["D2DS", "D2D"])].head(1)
         dh_link = maps_link_from_address(dh_row["address"].iloc[0]) if not dh_row.empty and dh_row["address"].iloc[0] else "TBD"
