@@ -80,9 +80,18 @@ jobs:
           DATE="${{ steps.date.outputs.next_saturday }}"
           IS_WEEK_1="${{ inputs.is_week_1 }}"
 
-          # Default to true if not set (for scheduled runs)
+          # Auto-detect is_week_1 based on date (for scheduled runs)
           if [ -z "$IS_WEEK_1" ]; then
-            IS_WEEK_1="true"
+            # Week 1 dates for each experiment phase
+            # Pilot: 2025-12-27
+            # Official: 2026-01-10
+            if [ "$DATE" = "2025-12-27" ] || [ "$DATE" = "2026-01-10" ]; then
+              IS_WEEK_1="true"
+              echo "Auto-detected: This is Week 1 of the experiment phase (24 DH, no D2DS)"
+            else
+              IS_WEEK_1="false"
+              echo "Auto-detected: This is Week 2+ (6 DH + 6 D2DS)"
+            fi
           fi
 
           echo "Generating plan for $DATE (is_week_1=$IS_WEEK_1)..."

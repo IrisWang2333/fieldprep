@@ -55,6 +55,7 @@ DEFAULT_SENDER   = "dschonho@usc.edu"
 
 ROLES = ["A", "B", "C", "D", "E", "F"]
 SUPERVISOR_NAMES = {"vickie", "carlie", "yifei"}  # case-insensitive
+SUPERVISOR_EMAILS = ["dschonho@usc.edu"]  # Always CC these emails
 
 # ---- Helpers ----
 def extract_spreadsheet_id(url_or_id: str) -> str:
@@ -241,6 +242,9 @@ def main():
         if e:
             supervisor_cc.append(e)
 
+    # Add fixed supervisor emails (always CC)
+    supervisor_cc.extend(SUPERVISOR_EMAILS)
+
 
     # Load starts.csv (long format with columns: date, interviewer, task, address)
     if not os.path.exists(starts_csv):
@@ -309,7 +313,11 @@ def main():
 
 
         try:
-            cc_list = [c for c in supervisor_cc if c.lower() != email.lower()]
+            # Filter out recipient and sender from CC list
+            cc_list = [
+                c for c in supervisor_cc
+                if c.lower() != email.lower() and c.lower() != args.sender.lower()
+            ]
 
             send_email(
                 gmail_service,
