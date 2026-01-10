@@ -258,7 +258,7 @@ def main():
         if col not in starts_df.columns:
             starts_df[col] = ""
     starts_df["date"] = starts_df["date"].astype(str).str.strip()
-    starts_df["interviewer"] = starts_df["interviewer"].astype(str).str.strip().str.upper()
+    starts_df["interviewer"] = starts_df["interviewer"].astype(str).str.strip()
     starts_df["task"] = starts_df["task"].astype(str).str.strip().str.upper()
     starts_df["address"] = starts_df["address"].astype(str).str.strip()
 
@@ -273,8 +273,8 @@ def main():
             print(f"WARNING: No email found for '{name}' in 'Email Addresses'; skipping {r}.")
             continue
 
-        # Filter starts for this date and role
-        s_slice = starts_df[(starts_df["date"] == date_str) & (starts_df["interviewer"] == r)]
+        # Filter starts for this date and interviewer NAME (not role code)
+        s_slice = starts_df[(starts_df["date"] == date_str) & (starts_df["interviewer"] == name)]
         dh_row = s_slice[s_slice["task"] == "DH"].head(1)
         d2_row = s_slice[s_slice["task"].isin(["D2DS", "D2D"])].head(1)
         dh_link = maps_link_from_address(dh_row["address"].iloc[0]) if not dh_row.empty and dh_row["address"].iloc[0] else "TBD"
