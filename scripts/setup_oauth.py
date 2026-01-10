@@ -24,7 +24,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 # Scopes required for Drive file upload
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+# Using full drive scope to allow access to existing folders
+SCOPES = ['https://www.googleapis.com/auth/drive']
 
 
 def setup_oauth_credentials(client_secrets_path='client_secrets.json'):
