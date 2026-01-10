@@ -296,8 +296,8 @@ def main():
             <p>Hello {name},</p>
             <p>The starting points of your tasks today are:</p>
             <ol>
-              <li>Door hangers (DH, 9-10am): <a href="{dh_link}">{dh_text}</a></li>
-              <li>Door-to-door survey (D2DS, 10am-4pm): <a href="{d2ds_link}">{d2ds_text}</a></li>
+              <li>Door hangers (DH): <a href="{dh_link}">{dh_text}</a></li>
+              <li>Door-to-door survey (D2DS): <a href="{d2ds_link}">{d2ds_text}</a></li>
             </ol>
             <p>As a reminder, you are assigned to be Interviewer {r}, so your map URL is
                 <a href="{map_url}">{map_url}</a>.</p>
@@ -313,10 +313,10 @@ def main():
 
 
         try:
-            # Filter out recipient and sender from CC list
+            # Filter out recipient from CC list (but keep sender for visibility)
             cc_list = [
                 c for c in supervisor_cc
-                if c.lower() != email.lower() and c.lower() != args.sender.lower()
+                if c.lower() != email.lower()
             ]
 
             send_email(
