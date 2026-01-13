@@ -1,0 +1,84 @@
+name: Deploy Map to Cloudflare Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Date of the map to deploy (YYYY-MM-DD)'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify map file exists
+        id: check_map
+        run: |
+          MAP_FILE="outputs/plans/bundles_plan_${{ inputs.date }}.html"
+          if [ ! -f "$MAP_FILE" ]; then
+            echo "❌ Map file not found: $MAP_FILE"
+            echo "Available maps:"
+            ls -lh outputs/plans/*.html 2>/dev/null || echo "No maps found"
+            exit 1
+          fi
+          echo "✓ Found map: $MAP_FILE"
+          echo "map_file=$MAP_FILE" >> $GITHUB_OUTPUT
+
+      - name: Prepare deployment directory
+        run: |
+          mkdir -p deploy
+          cp "${{ steps.check_map.outputs.map_file }}" deploy/index.html
+
+          # Create a simple landing page that lists all available maps
+          cat > deploy/list.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Field Assignment Maps</title>
+              <style>
+                  body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+                  h1 { color: #333; }
+                  .map-link {
+                      display: block;
+                      padding: 10px;
+                      margin: 5px 0;
+                      background: #f0f0f0;
+                      text-decoration: none;
+                      color: #0066cc;
+                      border-radius: 4px;
+                  }
+                  .map-link:hover { background: #e0e0e0; }
+              </style>
+          </head>
+          <body>
+              <h1>Field Assignment Maps</h1>
+              <p>Select a date to view the assignment map:</p>
+              <div id="maps"></div>
+              <script>
+                  // This will be populated dynamically in future versions
+                  document.getElementById('maps').innerHTML = '<a href="/" class="map-link">Latest Map (${{ inputs.date }})</a>';
+              </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: maps-deployment
+          directory: deploy
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
+
+      - name: Deployment complete
+        run: |
+          echo "✅ Map deployed successfully!"
+          echo "📍 URL: https://maps-deployment.pages.dev/"
+          echo "📅 Date: ${{ inputs.date }}"
