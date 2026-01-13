@@ -704,11 +704,71 @@ def run_emit(date: str, plan_csv: str, bundle_file: str | None = None, addr_assi
         print("[emit][WARN] The following interviewer-task(s) have zero valid SFH targets:")
         print(zero_rows[["interviewer", "task", "segment_id"]].to_string(index=False))
 
-    addr_rep = (
-        pts_task.groupby(["interviewer","task"], as_index=False)["address"]
-               .first()
+    # Find starting address: use segment endpoint and find nearest address
+    # Get segment geometries for start segments
+    start_seg_ids = starts["segment_id"].astype(str).values
+    segs_start = streets_m.loc[
+        streets_m[streets_key_global].astype(str).isin(start_seg_ids),
+        [streets_key_global, "geometry"]
+    ].copy()
+    segs_start.rename(columns={streets_key_global: "segment_id"}, inplace=True)
+    segs_start["segment_id"] = segs_start["segment_id"].astype(str)
+
+    # Extract first endpoint (start point) of each segment
+    def get_segment_start_point(geom):
+        """Extract the first coordinate (start point) from a LineString."""
+        from shapely.geometry import Point
+        if geom.geom_type == 'LineString':
+            return Point(geom.coords[0])
+        elif geom.geom_type == 'MultiLineString':
+            # For MultiLineString, use first point of first line
+            return Point(geom.geoms[0].coords[0])
+        else:
+            # Fallback: use centroid
+            return geom.centroid
+
+    segs_start["start_point"] = segs_start["geometry"].apply(get_segment_start_point)
+
+    # Merge start points with starts table
+    starts = starts.merge(
+        segs_start[["segment_id", "start_point"]],
+        on="segment_id",
+        how="left"
     )
-    starts = starts.merge(addr_rep, on=["interviewer","task"], how="left")
+
+    # For each start point, find nearest address from pts_task
+    # Need to use projected CRS (meters) for accurate distance calculation
+    # Get pts_task in meters CRS
+    pts_task_m = pts_task.copy()
+    if pts_task_m.crs and pts_task_m.crs != w_m:
+        pts_task_m = pts_task_m.to_crs(w_m)
+
+    start_addresses = []
+    for idx, row in starts.iterrows():
+        ivw, task = row["interviewer"], row["task"]
+        start_pt = row["start_point"]  # Already in meters (from streets_m)
+
+        # Get addresses for this interviewer-task (in meters CRS)
+        task_addrs = pts_task_m[
+            (pts_task_m["interviewer"] == ivw) &
+            (pts_task_m["task"] == task)
+        ].copy()
+
+        if task_addrs.empty or start_pt is None:
+            start_addresses.append("")
+            continue
+
+        # Calculate distance from start point to each address (in meters)
+        task_addrs["_dist"] = task_addrs.geometry.distance(start_pt)
+
+        # Get closest address
+        closest_idx = task_addrs["_dist"].idxmin()
+        # Get address from original pts_task (which has the formatted address)
+        closest_address = pts_task.loc[closest_idx, "address"]
+        start_addresses.append(closest_address)
+
+    starts["address"] = start_addresses
+    starts.drop(columns=["start_point"], inplace=True)
     starts.to_csv(out_dir / "starts.csv", index=False)
 
     # ---- Generate segment-level comprehensive CSV ----
