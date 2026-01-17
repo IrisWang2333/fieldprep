@@ -74,6 +74,36 @@ jobs:
           echo "next_saturday=$TARGET_DATE" >> $GITHUB_OUTPUT
           echo "Target date: $TARGET_DATE"
 
+      - name: Validate date (check exclusions and end date)
+        run: |
+          TARGET_DATE="${{ steps.date.outputs.next_saturday }}"
+
+          # Define excluded dates (holidays/breaks)
+          EXCLUDED_DATES=("2026-05-23" "2026-07-04")
+
+          # Define experiment end date
+          END_DATE="2026-08-15"
+
+          # Check if date is excluded
+          for excluded in "${EXCLUDED_DATES[@]}"; do
+            if [ "$TARGET_DATE" = "$excluded" ]; then
+              echo "❌ Date $TARGET_DATE is excluded (holiday/break)"
+              echo "Excluded dates: ${EXCLUDED_DATES[*]}"
+              exit 1
+            fi
+          done
+
+          # Check if date is after end date
+          if [[ "$TARGET_DATE" > "$END_DATE" ]]; then
+            echo "❌ Date $TARGET_DATE is after experiment end date ($END_DATE)"
+            echo "The experiment concluded on $END_DATE"
+            exit 1
+          fi
+
+          echo "✅ Date $TARGET_DATE is valid"
+          echo "Experiment runs until: $END_DATE"
+          echo "Excluded dates: ${EXCLUDED_DATES[*]}"
+
       - name: Run plan.py
         id: plan
         run: |
