@@ -57,6 +57,27 @@ jobs:
           print(f'Downloaded {len(activities)} pothole records')
           "
 
+      - name: Download historical plans from Google Drive
+        env:
+          GOOGLE_DRIVE_OAUTH_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_OAUTH_CREDENTIALS }}
+          GOOGLE_DRIVE_PLANS_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_PLANS_FOLDER_ID }}
+        run: |
+          echo "Downloading historical plans from Google Drive..."
+          echo "This is required for without-replacement bundle sampling"
+
+          # Create plans directory
+          mkdir -p outputs/plans
+
+          # Download all historical plan CSVs from Google Drive
+          python scripts/download_plans_from_drive.py \
+            "$GOOGLE_DRIVE_PLANS_FOLDER_ID" \
+            outputs/plans \
+            --oauth-credentials "$GOOGLE_DRIVE_OAUTH_CREDENTIALS"
+
+          # List downloaded plans
+          echo "Downloaded plans:"
+          ls -lh outputs/plans/
+
       - name: Calculate or use input date
         id: date
         run: |
@@ -187,6 +208,28 @@ jobs:
           # List generated files
           echo "Generated files:"
           ls -lh "$UPLOAD_DIR"
+
+      - name: Upload plan CSV to Google Drive plans folder
+        env:
+          GOOGLE_DRIVE_OAUTH_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_OAUTH_CREDENTIALS }}
+          GOOGLE_DRIVE_PLANS_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_PLANS_FOLDER_ID }}
+        run: |
+          DATE="${{ steps.date.outputs.next_saturday }}"
+          PLAN_CSV="${{ steps.plan.outputs.plan_csv }}"
+
+          echo "Uploading plan CSV to Google Drive plans folder..."
+          echo "This ensures future runs can track used bundles"
+
+          # Create temp directory with only the plan CSV
+          mkdir -p /tmp/plan_upload
+          cp "$PLAN_CSV" /tmp/plan_upload/
+
+          python scripts/upload_to_drive.py \
+            "/tmp/plan_upload" \
+            "$GOOGLE_DRIVE_PLANS_FOLDER_ID" \
+            --oauth-credentials "$GOOGLE_DRIVE_OAUTH_CREDENTIALS"
+
+          rm -rf /tmp/plan_upload
 
       - name: Upload to Google Drive
         env:
