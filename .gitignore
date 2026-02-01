@@ -73,6 +73,9 @@ outputs/**/*.pkl
 # Exception: allow locked address assignments needed for emit
 !outputs/sweep/locked/segment_addresses_b40_m2.parquet
 
+# Exception: allow plan CSVs for bundle tracking (without-replacement sampling)
+!outputs/plans/bundles_plan_*.csv
+
 # Keep directory structure but ignore contents
 !data/.gitkeep
 !outputs/bundles/.gitkeep
