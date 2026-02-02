@@ -20,6 +20,10 @@ on:
         type: boolean
         default: true
 
+# Required for git push
+permissions:
+  contents: write
+
 env:
   PYTHON_VERSION: '3.11'
 
