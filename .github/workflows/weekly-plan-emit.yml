@@ -190,28 +190,35 @@ jobs:
           print('Emit completed!')
           "
 
-      - name: Commit and push plan CSV to repository
+      - name: Commit and push plan files to repository
         run: |
           DATE="${{ steps.date.outputs.next_saturday }}"
           PLAN_CSV="${{ steps.plan.outputs.plan_csv }}"
+          SEGMENT_CSV="outputs/plans/segment_assignments_$DATE.csv"
 
-          echo "Committing plan CSV to repository..."
-          echo "This ensures future runs can track used bundles"
+          echo "Committing plan files to repository..."
+          echo "This ensures future runs can track used bundles and segment assignments"
 
           # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Add and commit the plan CSV
+          # Add plan CSV and segment assignments CSV
           git add "$PLAN_CSV"
+          if [ -f "$SEGMENT_CSV" ]; then
+            git add "$SEGMENT_CSV"
+            echo "✓ Added segment assignments file: $SEGMENT_CSV"
+          else
+            echo "⚠ Segment assignments file not found: $SEGMENT_CSV"
+          fi
 
           # Only commit if there are changes
           if git diff --staged --quiet; then
-            echo "No changes to commit (plan CSV already exists)"
+            echo "No changes to commit (files already exist)"
           else
-            git commit -m "Add plan for $DATE [automated]"
+            git commit -m "Add plan and segment assignments for $DATE [automated]"
             git push
-            echo "✓ Plan CSV committed and pushed to repository"
+            echo "✓ Plan files committed and pushed to repository"
           fi
 
       - name: Prepare upload directory
