@@ -18,7 +18,7 @@ on:
         description: 'Is this Week 1? (true = 24 DH only, false = 6 DH + 6 D2DS)'
         required: false
         type: boolean
-        default: true
+        default: false
 
 # Required for git push
 permissions:
