@@ -207,10 +207,18 @@ def get_previous_week_conditional_bundles(
     print(f"  DEBUG: Found {len(eligible_for_prev)} eligible bundles for {prev_date_str}")
     print(f"  DEBUG: prev_dh_bundles types: {[type(b).__name__ for b in list(prev_dh_bundles)[:3]]}")
     print(f"  DEBUG: eligible_for_prev types: {[type(b).__name__ for b in list(eligible_for_prev)[:3]] if eligible_for_prev else 'empty'}")
+    print(f"  DEBUG: prev_dh_bundles values: {sorted(list(prev_dh_bundles))}")
+    print(f"  DEBUG: eligible_for_prev sample (first 10): {sorted(list(eligible_for_prev))[:10]}")
 
     # Conditional bundles = prev week's DH bundles that were also eligible
     # Explicitly convert both to int to avoid type mismatch (CSV→int, parquet→float64)
-    conditional_from_prev = set(int(b) for b in prev_dh_bundles) & set(int(b) for b in eligible_for_prev)
+    prev_dh_set = set(int(b) for b in prev_dh_bundles)
+    eligible_set = set(int(b) for b in eligible_for_prev)
+
+    print(f"  DEBUG: After int conversion - prev_dh_set: {sorted(prev_dh_set)}")
+    print(f"  DEBUG: After int conversion - eligible_set sample: {sorted(list(eligible_set))[:10]}")
+
+    conditional_from_prev = prev_dh_set & eligible_set
 
     print(f"  Previous week ({prev_date_str}): {len(prev_dh_bundles)} DH bundles")
     print(f"  Of those, {len(conditional_from_prev)} were conditional (had potholes)")
