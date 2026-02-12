@@ -214,7 +214,8 @@ def get_previous_week_conditional_bundles(
 
 def filter_available_bundles(
     all_bundles: Set[int],
-    used_tracker: Dict[str, Set[int]]
+    used_tracker: Dict[str, Set[int]],
+    exempt_bundles: Set[int] = None
 ) -> Set[int]:
     """
     Filter out bundles that have been used in previous plans.
@@ -225,20 +226,31 @@ def filter_available_bundles(
         All possible bundle IDs
     used_tracker : dict
         Output from get_used_bundles()
+    exempt_bundles : set, optional
+        Bundle IDs that are exempt from the without-replacement rule.
+        These bundles will be available even if they were used before.
+        Used for D2DS conditional reuse of previous week's DH conditional bundles.
 
     Returns
     -------
-    set of bundle IDs that haven't been used yet
+    set of bundle IDs that haven't been used yet (plus any exempt bundles)
     """
-    available = all_bundles - used_tracker['all']
+    exempt_bundles = exempt_bundles or set()
+
+    # Allow bundles that are either unused OR exempted
+    # This supports D2DS conditional reuse while maintaining without-replacement for others
+    available = (all_bundles - used_tracker['all']) | (exempt_bundles & all_bundles)
 
     n_total = len(all_bundles)
     n_used = len(used_tracker['all'])
+    n_exempt = len(exempt_bundles & all_bundles)
     n_available = len(available)
 
     print(f"\n[Bundle Availability]")
     print(f"  Total bundles: {n_total}")
     print(f"  Used in previous plans: {n_used}")
+    if n_exempt > 0:
+        print(f"  Exempt from without-replacement: {n_exempt} (for D2DS conditional reuse)")
     print(f"  Available for sampling: {n_available}")
 
     if n_available < 30:  # Less than 2 weeks worth

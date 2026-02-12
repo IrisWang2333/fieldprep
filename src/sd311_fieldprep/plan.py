@@ -414,8 +414,31 @@ def run_plan(
     # Get all bundle IDs for sampling
     all_bundle_ids_before_filter = set(all_candidates["bundle_id"].unique())
 
+    # ============================================================================
+    # IMPORTANT: Get previous week's DH conditional bundles BEFORE filtering
+    # These bundles need to be exempt from without-replacement for D2DS reuse
+    # ============================================================================
+    print(f"\n[D2DS Exemption] Checking previous week's DH conditional for D2DS reuse...")
+    prev_week_conditional = get_previous_week_conditional_bundles(
+        plan_dir=plan_dir,
+        current_date=date,
+        activities_df=activities,
+        bundles_df=g_dh,
+        min_date=phase_min_date,  # Only look within current phase
+        max_date=phase_max_date   # Ensure we stay within phase
+    )
+
     # Filter out previously used bundles to ensure without-replacement
+    # For DH sampling: strict without-replacement (no exemptions)
     all_bundle_ids = filter_available_bundles(all_bundle_ids_before_filter, used_tracker)
+
+    # For D2DS sampling: exempt previous week's DH conditional bundles
+    # This allows D2DS to reuse them despite the without-replacement rule
+    all_bundle_ids_for_d2ds = filter_available_bundles(
+        all_bundle_ids_before_filter,
+        used_tracker,
+        exempt_bundles=prev_week_conditional
+    )
 
     # Also filter eligible bundles
     eligible_bundle_ids_filtered = set(eligible_candidates["bundle_id"].unique()) & all_bundle_ids
@@ -551,19 +574,9 @@ def run_plan(
     if not is_week_1 and "D2DS" in [t.upper() for t in tasks]:
         print(f"\n[D2DS Sampling] Selecting D2DS bundles...")
 
-        # CRITICAL: D2DS conditional bundles should come from PREVIOUS week's DH conditional
-        # Must be from the SAME experiment phase (pilot or official)
-        prev_week_conditional = get_previous_week_conditional_bundles(
-            plan_dir=plan_dir,
-            current_date=date,
-            activities_df=activities,
-            bundles_df=g_dh,
-            min_date=phase_min_date,  # Only look within current phase
-            max_date=phase_max_date   # Ensure we stay within phase
-        )
-
         # Update available bundles (exclude already used DH bundles)
-        all_available_for_d2ds = all_bundle_ids - set(sampled_dh_bundles)
+        # Use all_bundle_ids_for_d2ds which includes exemption for prev week's DH conditional
+        all_available_for_d2ds = all_bundle_ids_for_d2ds - set(sampled_dh_bundles)
 
         # For random D2DS, use bundles that had potholes in the ACTUAL previous field work week
         # For Jan 3 (Week 2), this should be Dec 27 - Jan 2 (when Dec 27's DH work happened)
