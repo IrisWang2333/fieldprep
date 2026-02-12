@@ -377,7 +377,18 @@ def run_emit(date: str, plan_csv: str, bundle_file: str | None = None, addr_assi
     plan = plan.loc[plan["date"] == date].copy()
     if plan.empty:
         raise SystemExit(f"No rows in plan for date={date}")
-    # Ignore any plan-time dh_saturation; we randomize per-segment below
+
+    # ---- Segment Assignments (for segment-level DH treatment) ----
+    segment_assignments = None
+    segment_assign_csv = out_root / "plans" / f"segment_assignments_{date}.csv"
+    if segment_assign_csv.exists():
+        segment_assignments = pd.read_csv(segment_assign_csv)
+        segment_assignments["segment_id"] = segment_assignments["segment_id"].astype(str)
+        print(f"[emit] Loaded segment assignments from {segment_assign_csv}")
+        print(f"[emit]   {len(segment_assignments)} segment assignments loaded")
+    else:
+        print(f"[emit][WARN] No segment assignments file found at {segment_assign_csv}")
+        print(f"[emit][WARN] Will fall back to old bundle-level allocation")
 
     # ---- Bundles ----
     bundles = {}
@@ -642,83 +653,148 @@ def run_emit(date: str, plan_csv: str, bundle_file: str | None = None, addr_assi
         closest_address = pts_task.loc[closest_idx, "address"]
         start_addresses_dict[(ivw, task, seg_id)] = closest_address
 
-    # ---- Address-level DH treatment allocation ----
-    # For DH tasks: allocate addresses within each bundle to 50% control, 25% full, 25% partial
+    # ---- Segment-level DH treatment allocation ----
+    # Use segment assignments if available, otherwise fall back to old bundle-level allocation
     pts_task["dh_treatment"] = ""  # Will be: control/full/partial for DH addresses
     pts_task["dh_selected"] = True  # Whether to include in final output
 
     is_dh = pts_task["task"].astype(str).str.upper().eq("DH")
 
     if is_dh.any():
-        print(f"[emit] Allocating DH addresses to treatment groups (50% control, 25% full, 25% partial)...")
+        if segment_assignments is not None:
+            # NEW: Segment-level allocation based on segment_assignments.csv
+            print(f"[emit] Allocating DH addresses using SEGMENT-LEVEL assignments...")
 
-        # Group DH addresses by (interviewer, bundle_id)
-        for (ivw, bid), g in pts_task.loc[is_dh].groupby(["interviewer", "bundle_id"], dropna=False):
-            n = len(g)
-            idx = g.index.to_numpy()
+            # Merge segment assignments into pts_task
+            pts_task_dh = pts_task.loc[is_dh].copy()
+            pts_task_dh = pts_task_dh.merge(
+                segment_assignments[["segment_id", "dh_arm", "treated_share"]],
+                on="segment_id",
+                how="left"
+            )
 
-            # Round down to multiple of 4 for clean 50%/25%/25% split
-            n_usable = (n // 4) * 4
-            n_control = n_usable // 2
-            n_full = n_usable // 4
-            n_partial = n_usable // 4
+            # For each segment, apply its assignment
+            for (ivw, seg_id), g in pts_task_dh.groupby(["interviewer", "segment_id"], dropna=False):
+                idx = g.index.to_numpy()
+                n = len(idx)
 
-            # Create seed for this bundle's randomization
-            seed = _stable_seed_bundle_treatment(date, ivw, bid)
-            rng = np.random.default_rng(seed)
+                # Get this segment's assignment
+                if len(g) > 0 and "dh_arm" in g.columns:
+                    dh_arm = g["dh_arm"].iloc[0]
+                else:
+                    print(f"[emit][WARN] No assignment for segment {seg_id}, defaulting to Control")
+                    dh_arm = "Control"
 
-            # Shuffle indices
-            shuffled = rng.permutation(idx)
+                # Apply the assignment
+                if dh_arm == "Control":
+                    # Control: no addresses selected
+                    pts_task.loc[idx, "dh_treatment"] = "control"
+                    pts_task.loc[idx, "dh_selected"] = False
 
-            # Assign first n_usable addresses
-            control_idx = shuffled[:n_control]
-            full_idx = shuffled[n_control:n_control + n_full]
-            partial_idx = shuffled[n_control + n_full:n_usable]
+                elif dh_arm == "Full":
+                    # Full: all addresses selected
+                    pts_task.loc[idx, "dh_treatment"] = "full"
+                    pts_task.loc[idx, "dh_selected"] = True
 
-            # Assign remainder to keep full and partial balanced
-            # Priority: control gets more (50%), then balance full/partial (25% each)
-            if n > n_usable:
-                remainder_idx = shuffled[n_usable:]
-                n_remainder = len(remainder_idx)
+                elif dh_arm == "Partial":
+                    # Partial: randomly select 50% of addresses
+                    pts_task.loc[idx, "dh_treatment"] = "partial"
 
-                if n_remainder == 1:
-                    # Give to control (maintains 50% ratio)
-                    control_idx = np.append(control_idx, remainder_idx[0])
-                elif n_remainder == 2:
-                    # Give 1 to control, 1 randomly to full or partial (keeps them balanced)
-                    control_idx = np.append(control_idx, remainder_idx[0])
-                    if rng.random() < 0.5:
-                        full_idx = np.append(full_idx, remainder_idx[1])
+                    k = n // 2  # Select half
+                    if k > 0:
+                        seed_partial = _stable_seed_segment(date, ivw, seg_id)
+                        rng_partial = np.random.default_rng(seed_partial)
+                        keep_partial = rng_partial.choice(idx, size=k, replace=False)
+                        pts_task.loc[idx, "dh_selected"] = False  # First mark all as not selected
+                        pts_task.loc[keep_partial, "dh_selected"] = True  # Then mark the selected ones
                     else:
-                        partial_idx = np.append(partial_idx, remainder_idx[1])
-                elif n_remainder == 3:
-                    # Give 1 to each group (keeps ratios perfect)
-                    control_idx = np.append(control_idx, remainder_idx[0])
-                    full_idx = np.append(full_idx, remainder_idx[1])
-                    partial_idx = np.append(partial_idx, remainder_idx[2])
+                        # If only 0-1 addresses, mark all as not selected
+                        pts_task.loc[idx, "dh_selected"] = False
 
-            # Mark treatment assignments
-            pts_task.loc[control_idx, "dh_treatment"] = "control"
-            pts_task.loc[full_idx, "dh_treatment"] = "full"
-            pts_task.loc[partial_idx, "dh_treatment"] = "partial"
+                else:
+                    print(f"[emit][WARN] Unknown dh_arm '{dh_arm}' for segment {seg_id}, defaulting to Control")
+                    pts_task.loc[idx, "dh_treatment"] = "control"
+                    pts_task.loc[idx, "dh_selected"] = False
 
-            # Control addresses not selected (not visited)
-            pts_task.loc[control_idx, "dh_selected"] = False
+            # Print summary
+            n_full = (pts_task.loc[is_dh, "dh_treatment"] == "full").sum()
+            n_partial = (pts_task.loc[is_dh, "dh_treatment"] == "partial").sum()
+            n_control = (pts_task.loc[is_dh, "dh_treatment"] == "control").sum()
+            n_total = len(pts_task.loc[is_dh])
+            print(f"[emit]   Segment-level allocation summary:")
+            print(f"[emit]     Full: {n_full} addresses")
+            print(f"[emit]     Partial: {n_partial} addresses")
+            print(f"[emit]     Control: {n_control} addresses")
+            print(f"[emit]     Total: {n_total} addresses")
 
-            # Full addresses all selected (100% visited)
-            pts_task.loc[full_idx, "dh_selected"] = True
+        else:
+            # FALLBACK: Old bundle-level allocation
+            print(f"[emit] Allocating DH addresses using BUNDLE-LEVEL allocation (fallback)...")
+            print(f"[emit]   (50% control, 25% full, 25% partial per bundle)")
 
-            # Partial addresses: randomly select 50%
-            if len(partial_idx) > 0:
-                k = len(partial_idx) // 2
-                if k > 0:
-                    seed_partial = _stable_seed(date, ivw, bid)
-                    rng_partial = np.random.default_rng(seed_partial)
-                    keep_partial = rng_partial.choice(partial_idx, size=k, replace=False)
-                    pts_task.loc[partial_idx, "dh_selected"] = False
-                    pts_task.loc[keep_partial, "dh_selected"] = True
+            # Group DH addresses by (interviewer, bundle_id)
+            for (ivw, bid), g in pts_task.loc[is_dh].groupby(["interviewer", "bundle_id"], dropna=False):
+                n = len(g)
+                idx = g.index.to_numpy()
 
-            print(f"[emit]   {ivw} bundle {bid}: {len(control_idx)} control, {len(full_idx)} full, {len(partial_idx)} partial (total {n})")
+                # Round down to multiple of 4 for clean 50%/25%/25% split
+                n_usable = (n // 4) * 4
+                n_control = n_usable // 2
+                n_full = n_usable // 4
+                n_partial = n_usable // 4
+
+                # Create seed for this bundle's randomization
+                seed = _stable_seed_bundle_treatment(date, ivw, bid)
+                rng = np.random.default_rng(seed)
+
+                # Shuffle indices
+                shuffled = rng.permutation(idx)
+
+                # Assign first n_usable addresses
+                control_idx = shuffled[:n_control]
+                full_idx = shuffled[n_control:n_control + n_full]
+                partial_idx = shuffled[n_control + n_full:n_usable]
+
+                # Assign remainder to keep full and partial balanced
+                if n > n_usable:
+                    remainder_idx = shuffled[n_usable:]
+                    n_remainder = len(remainder_idx)
+
+                    if n_remainder == 1:
+                        control_idx = np.append(control_idx, remainder_idx[0])
+                    elif n_remainder == 2:
+                        control_idx = np.append(control_idx, remainder_idx[0])
+                        if rng.random() < 0.5:
+                            full_idx = np.append(full_idx, remainder_idx[1])
+                        else:
+                            partial_idx = np.append(partial_idx, remainder_idx[1])
+                    elif n_remainder == 3:
+                        control_idx = np.append(control_idx, remainder_idx[0])
+                        full_idx = np.append(full_idx, remainder_idx[1])
+                        partial_idx = np.append(partial_idx, remainder_idx[2])
+
+                # Mark treatment assignments
+                pts_task.loc[control_idx, "dh_treatment"] = "control"
+                pts_task.loc[full_idx, "dh_treatment"] = "full"
+                pts_task.loc[partial_idx, "dh_treatment"] = "partial"
+
+                # Control addresses not selected
+                pts_task.loc[control_idx, "dh_selected"] = False
+
+                # Full addresses all selected
+                pts_task.loc[full_idx, "dh_selected"] = True
+
+                # Partial addresses: randomly select 50%
+                if len(partial_idx) > 0:
+                    k = len(partial_idx) // 2
+                    if k > 0:
+                        seed_partial = _stable_seed(date, ivw, bid)
+                        rng_partial = np.random.default_rng(seed_partial)
+                        keep_partial = rng_partial.choice(partial_idx, size=k, replace=False)
+                        pts_task.loc[partial_idx, "dh_selected"] = False
+                        pts_task.loc[keep_partial, "dh_selected"] = True
+
+                print(f"[emit]   {ivw} bundle {bid}: {len(control_idx)} control, {len(full_idx)} full, {len(partial_idx)} partial (total {n})")
 
     # --- Keep only the addresses we actually want crews to visit ---
     is_dh = pts_task["task"].astype(str).str.upper().eq("DH")
