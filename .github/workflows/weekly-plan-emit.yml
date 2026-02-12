@@ -247,15 +247,24 @@ jobs:
             "$GOOGLE_DRIVE_FOLDER_ID" \
             --oauth-credentials "$GOOGLE_DRIVE_OAUTH_CREDENTIALS"
 
-      - name: Upload segment_analysis to Google Drive routing folder
+      - name: Upload segment_analysis and segment_assignments to Google Drive routing folder
         env:
           GOOGLE_DRIVE_OAUTH_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_OAUTH_CREDENTIALS }}
           GOOGLE_DRIVE_ROUTING_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_ROUTING_FOLDER_ID }}
         run: |
           DATE="${{ steps.date.outputs.next_saturday }}"
           ROUTING_DIR="outputs/routing/segment_analysis/$DATE"
+          SEGMENT_CSV="outputs/plans/segment_assignments_$DATE.csv"
 
-          echo "Uploading segment_analysis.csv to Google Drive routing folder..."
+          # Copy segment_assignments to routing folder for upload
+          if [ -f "$SEGMENT_CSV" ]; then
+            cp "$SEGMENT_CSV" "$ROUTING_DIR/"
+            echo "✓ Copied segment_assignments to routing folder"
+          else
+            echo "⚠ Segment assignments file not found: $SEGMENT_CSV"
+          fi
+
+          echo "Uploading routing files to Google Drive routing folder..."
           python scripts/upload_to_drive.py \
             "$ROUTING_DIR" \
             "$GOOGLE_DRIVE_ROUTING_FOLDER_ID" \
