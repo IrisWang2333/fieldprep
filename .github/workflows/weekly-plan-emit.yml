@@ -158,7 +158,7 @@ jobs:
               tasks=('DH', 'D2DS'),
               list_code=30,
               seed=42,
-              bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet',
+              bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered_length_3.parquet',
               is_week_1=is_week_1
           )
           print(f'Plan created: {plan_csv}')
@@ -184,7 +184,7 @@ jobs:
           run_emit(
               date='$DATE',
               plan_csv='$PLAN_CSV',
-              bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered.parquet',
+              bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered_length_3.parquet',
               addr_assignment_file='outputs/sweep/locked/segment_addresses_b40_m2.parquet'
           )
           print('Emit completed!')

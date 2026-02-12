@@ -179,7 +179,7 @@ def run_plan(
     list_code: int = 30,
     seed: int = 42,
     out_csv: str | None = None,
-    bundle_file: str | None = "outputs/bundles/DH/bundles_multibfs_regroup_filtered_length.parquet",
+    bundle_file: str | None = "outputs/bundles/DH/bundles_multibfs_regroup_filtered_length_3.parquet",
     is_week_1: bool = False,
 ):
     """
@@ -210,8 +210,8 @@ def run_plan(
         seed: Random seed for reproducible bundle selection
         out_csv: Optional explicit output CSV path
         bundle_file: Optional path to shared bundle file for all tasks.
-                     Default: "outputs/bundles/DH/bundles_multibfs_regroup_filtered_length.parquet"
-                     This is the length-filtered version (bundles ≤ 1.5 km total length).
+                     Default: "outputs/bundles/DH/bundles_multibfs_regroup_filtered_length_3.parquet"
+                     This is the length-filtered version (bundles < 3 km total length).
                      Both DH and D2DS will use this file instead of task-specific bundles.
                      This ensures both tasks use the same filtered/validated bundle set
                      without overly long bundles that may be difficult to complete.
