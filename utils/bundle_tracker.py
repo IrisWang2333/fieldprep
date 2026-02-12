@@ -204,7 +204,8 @@ def get_previous_week_conditional_bundles(
     )
 
     # Conditional bundles = prev week's DH bundles that were also eligible
-    conditional_from_prev = set(prev_dh_bundles) & eligible_for_prev
+    # Explicitly convert both to int to avoid type mismatch (CSV→int, parquet→float64)
+    conditional_from_prev = set(int(b) for b in prev_dh_bundles) & set(int(b) for b in eligible_for_prev)
 
     print(f"  Previous week ({prev_date_str}): {len(prev_dh_bundles)} DH bundles")
     print(f"  Of those, {len(conditional_from_prev)} were conditional (had potholes)")
