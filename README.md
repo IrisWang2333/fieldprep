@@ -156,11 +156,38 @@ A bundle is **eligible** if at least one segment in the bundle had a pothole rep
   - 4 from DH conditional (reused)
   - 2 random (new bundles)
 
+### Segment-Level DH Treatment Assignment
+
+For each segment within DH bundles, the system assigns a treatment intensity arm:
+
+- **Full Treatment** (25% probability): All addresses in segment receive door hangers (treated_share = 1.0)
+- **Partial Treatment** (50% probability): Half of addresses in segment receive door hangers (treated_share = 0.5)
+- **Control** (25% probability): No addresses in segment receive door hangers (treated_share = 0.0)
+
+Assignment is randomized independently for each segment using the specified seed.
+
+**Output**: Segment assignments are saved to `outputs/plans/segment_assignments_YYYY-MM-DD.csv` with columns:
+- `date`: Field date
+- `bundle_id`: Bundle identifier
+- `segment_id`: Street segment identifier
+- `dh_arm`: Treatment arm (Full, Partial, Control)
+- `treated_share`: Share of addresses to treat (1.0, 0.5, 0.0)
+
 ### Without Replacement
 
 Each bundle is used at most once throughout the entire experiment.
 
 ## Output Files
+
+### Plan Files
+
+Generated in `outputs/plans/`:
+
+- `bundles_plan_YYYY-MM-DD.csv`: Bundle assignments to interviewers
+- `segment_assignments_YYYY-MM-DD.csv`: Segment-level DH treatment assignments (Full/Partial/Control)
+- `bundles_plan_YYYY-MM-DD.html`: Map visualization of selected bundles
+
+### Field Files
 
 Generated in `outputs/incoming/daily/YYYY-MM-DD/`:
 

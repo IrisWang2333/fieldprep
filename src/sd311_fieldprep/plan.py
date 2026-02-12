@@ -479,6 +479,59 @@ def run_plan(
     dh_details = all_candidates[all_candidates['bundle_id'].isin(sampled_dh_bundles)].copy()
 
     # ============================================================================
+    # SEGMENT-LEVEL DH ARM ASSIGNMENT
+    # ============================================================================
+    print(f"\n[Segment Assignment] Assigning DH arms to segments within bundles...")
+
+    # Collect all segments in DH bundles
+    segment_assignments = []
+
+    for bundle_id in sampled_dh_bundles:
+        # Get segments in this bundle
+        bundle_segs = dh_details[dh_details['bundle_id'] == bundle_id]['_seg_ids'].iloc[0]
+
+        if not bundle_segs or len(bundle_segs) == 0:
+            continue
+
+        # For each segment, assign Full/Partial/Control with probs (1/4, 1/2, 1/4)
+        for segment_id in bundle_segs:
+            # Draw assignment
+            arm_draw = rng.choice(['Full', 'Partial', 'Control'], p=[0.25, 0.5, 0.25])
+
+            # For Partial, treated share is 0.5 (half of addresses)
+            # For Full, treated share is 1.0 (all addresses)
+            # For Control, treated share is 0.0 (no addresses)
+            if arm_draw == 'Full':
+                treated_share = 1.0
+            elif arm_draw == 'Partial':
+                treated_share = 0.5
+            else:  # Control
+                treated_share = 0.0
+
+            segment_assignments.append({
+                'date': date,
+                'bundle_id': int(bundle_id),
+                'segment_id': str(segment_id),
+                'dh_arm': arm_draw,
+                'treated_share': treated_share
+            })
+
+    print(f"  Assigned DH arms to {len(segment_assignments)} segments")
+    print(f"    Full: {sum(1 for s in segment_assignments if s['dh_arm'] == 'Full')} segments")
+    print(f"    Partial: {sum(1 for s in segment_assignments if s['dh_arm'] == 'Partial')} segments")
+    print(f"    Control: {sum(1 for s in segment_assignments if s['dh_arm'] == 'Control')} segments")
+
+    # Save segment assignments to CSV
+    if segment_assignments:
+        seg_assign_df = pd.DataFrame(segment_assignments)
+        seg_assign_csv = str(out_root / "plans" / f"segment_assignments_{date}.csv")
+        ensure_dir(Path(seg_assign_csv).parent)
+        seg_assign_df.to_csv(seg_assign_csv, index=False)
+        print(f"  Saved segment assignments to: {seg_assign_csv}")
+    else:
+        print(f"  No segment assignments to save (no DH bundles sampled)")
+
+    # ============================================================================
     # Optimize bundle-to-interviewer assignment using interviewer-aware bisection
     # ============================================================================
     print(f"\n[Assignment Optimization] Assigning DH bundles to interviewers using interviewer-aware bisection...")
