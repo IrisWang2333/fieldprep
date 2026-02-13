@@ -472,8 +472,26 @@ def run_plan(
     dh_random_bundles = dh_sample_result['random']
 
     print(f"  Sampled {len(sampled_dh_bundles)} DH bundles:")
-    print(f"    Conditional: {len(dh_conditional_bundles)}")
-    print(f"    Random: {len(dh_random_bundles)}")
+    print(f"    Conditional: {len(dh_conditional_bundles)} - {sorted(dh_conditional_bundles)}")
+    print(f"    Random: {len(dh_random_bundles)} - {sorted(dh_random_bundles)}")
+
+    # Print detailed pothole information for conditional bundles
+    if dh_conditional_bundles:
+        print(f"\n[Pothole Details] Segments with potholes in conditional DH bundles:")
+        potholes_in_preceding = activities[
+            (activities['date_reported'] >= preceding_week_start) &
+            (activities['date_reported'] <= preceding_week_end)
+        ].copy()
+
+        for bundle_id in sorted(dh_conditional_bundles):
+            bundle_segs = g_dh[g_dh['bundle_id'] == bundle_id]['segment_id'].unique()
+            bundle_potholes = potholes_in_preceding[potholes_in_preceding['segment_id'].isin(bundle_segs)]
+
+            if len(bundle_potholes) > 0:
+                segs_with_potholes = bundle_potholes.groupby('segment_id').size().to_dict()
+                print(f"  Bundle {bundle_id}: {len(bundle_potholes)} potholes across {len(segs_with_potholes)} segments")
+                for seg_id, count in sorted(segs_with_potholes.items()):
+                    print(f"    - Segment {seg_id}: {count} pothole(s)")
 
     # Get bundle details for DH bundles
     dh_details = all_candidates[all_candidates['bundle_id'].isin(sampled_dh_bundles)].copy()
@@ -579,11 +597,18 @@ def run_plan(
                 n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
                 seg_list = bundle_row['_seg_ids'].iloc[0]
 
+                # Determine bundle type
+                if bundle_id in dh_conditional_bundles:
+                    bundle_type = "conditional"
+                else:
+                    bundle_type = "random"
+
                 rows.append({
                     "date": date,
                     "interviewer": interviewer_code,
                     "task": "DH",
                     "bundle_id": int(bundle_id),
+                    "bundle_type": bundle_type,
                     "list_code": int(list_code),
                     "sfh_bundle_total": n_sfh,
                 })
@@ -609,11 +634,18 @@ def run_plan(
             n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
             seg_list = bundle_row['_seg_ids'].iloc[0]
 
+            # Determine bundle type
+            if bundle_id in dh_conditional_bundles:
+                bundle_type = "conditional"
+            else:
+                bundle_type = "random"
+
             rows.append({
                 "date": date,
                 "interviewer": ivw,
                 "task": "DH",
                 "bundle_id": int(bundle_id),
+                "bundle_type": bundle_type,
                 "list_code": int(list_code),
                 "sfh_bundle_total": n_sfh,
             })
@@ -657,8 +689,8 @@ def run_plan(
         d2ds_random = d2ds_selection['d2ds_random']
 
         print(f"  Sampled {len(sampled_d2ds_bundles)} D2DS bundles:")
-        print(f"    From DH conditional: {len(d2ds_conditional)}")
-        print(f"    Random: {len(d2ds_random)}")
+        print(f"    From DH conditional: {len(d2ds_conditional)} - {sorted(d2ds_conditional)}")
+        print(f"    Random: {len(d2ds_random)} - {sorted(d2ds_random)}")
 
         # Mark DH bundles that are also used for D2DS
         for bundle_id in d2ds_conditional:
@@ -723,11 +755,18 @@ def run_plan(
                     n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
                     seg_list = bundle_row['_seg_ids'].iloc[0] if bundle_id in d2ds_random else []
 
+                    # Determine bundle type
+                    if bundle_id in d2ds_conditional:
+                        bundle_type = "d2ds_conditional"
+                    else:
+                        bundle_type = "d2ds_random"
+
                     rows.append({
                         "date": date,
                         "interviewer": interviewer_code,
                         "task": "D2DS",
                         "bundle_id": int(bundle_id),
+                        "bundle_type": bundle_type,
                         "list_code": int(list_code),
                         "sfh_bundle_total": n_sfh,
                     })
@@ -757,11 +796,18 @@ def run_plan(
                 n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
                 seg_list = bundle_row['_seg_ids'].iloc[0] if bundle_id in d2ds_random else []
 
+                # Determine bundle type
+                if bundle_id in d2ds_conditional:
+                    bundle_type = "d2ds_conditional"
+                else:
+                    bundle_type = "d2ds_random"
+
                 rows.append({
                     "date": date,
                     "interviewer": ivw,
                     "task": "D2DS",
                     "bundle_id": int(bundle_id),
+                    "bundle_type": bundle_type,
                     "list_code": int(list_code),
                     "sfh_bundle_total": n_sfh,
                 })
@@ -779,6 +825,56 @@ def run_plan(
     ensure_dir(Path(out_csv).parent)
     plan.to_csv(out_csv, index=False)
     print(f"[plan] wrote {out_csv} ({len(plan)} rows)")
+
+    # ============================================================================
+    # Save bundle metadata with detailed pothole information
+    # ============================================================================
+    print(f"\n[Bundle Metadata] Saving detailed bundle and pothole information...")
+
+    metadata_records = []
+    potholes_in_preceding = activities[
+        (activities['date_reported'] >= preceding_week_start) &
+        (activities['date_reported'] <= preceding_week_end)
+    ].copy()
+
+    # DH bundles
+    for bundle_id in sampled_dh_bundles:
+        bundle_type = "conditional" if bundle_id in dh_conditional_bundles else "random"
+        bundle_segs = g_dh[g_dh['bundle_id'] == bundle_id]['segment_id'].unique()
+        bundle_potholes = potholes_in_preceding[potholes_in_preceding['segment_id'].isin(bundle_segs)]
+
+        metadata_records.append({
+            'date': date,
+            'task': 'DH',
+            'bundle_id': int(bundle_id),
+            'bundle_type': bundle_type,
+            'num_segments': len(bundle_segs),
+            'num_potholes_in_preceding_week': len(bundle_potholes),
+            'segments_with_potholes': ','.join(sorted(bundle_potholes['segment_id'].unique())) if len(bundle_potholes) > 0 else '',
+        })
+
+    # D2DS bundles (only if not Week 1)
+    if not is_week_1 and "D2DS" in [t.upper() for t in tasks]:
+        for bundle_id in sampled_d2ds_bundles:
+            bundle_type = "d2ds_conditional" if bundle_id in d2ds_conditional else "d2ds_random"
+            bundle_segs = g_dh[g_dh['bundle_id'] == bundle_id]['segment_id'].unique()
+            bundle_potholes = potholes_in_preceding[potholes_in_preceding['segment_id'].isin(bundle_segs)]
+
+            metadata_records.append({
+                'date': date,
+                'task': 'D2DS',
+                'bundle_id': int(bundle_id),
+                'bundle_type': bundle_type,
+                'num_segments': len(bundle_segs),
+                'num_potholes_in_preceding_week': len(bundle_potholes),
+                'segments_with_potholes': ','.join(sorted(bundle_potholes['segment_id'].unique())) if len(bundle_potholes) > 0 else '',
+            })
+
+    metadata_df = pd.DataFrame(metadata_records)
+    metadata_csv = str(out_root / "plans" / f"bundle_metadata_{date}.csv")
+    metadata_df.to_csv(metadata_csv, index=False)
+    print(f"  Saved bundle metadata to: {metadata_csv}")
+    print(f"  Contains: {len(metadata_records)} bundle records with pothole details")
 
     # --- Small HTML map (red=DH, blue=D2DS) with SFH points saved next to the CSV ---
     try:

@@ -195,16 +195,19 @@ jobs:
           DATE="${{ steps.date.outputs.next_saturday }}"
           PLAN_CSV="${{ steps.plan.outputs.plan_csv }}"
           SEGMENT_CSV="outputs/plans/segment_assignments_$DATE.csv"
+          METADATA_CSV="outputs/plans/bundle_metadata_$DATE.csv"
 
           echo "Committing plan files to repository..."
-          echo "This ensures future runs can track used bundles and segment assignments"
+          echo "This ensures future runs can track used bundles, segment assignments, and pothole metadata"
 
           # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Add plan CSV and segment assignments CSV
+          # Add plan CSV
           git add "$PLAN_CSV"
+
+          # Add segment assignments CSV
           if [ -f "$SEGMENT_CSV" ]; then
             git add "$SEGMENT_CSV"
             echo "✓ Added segment assignments file: $SEGMENT_CSV"
@@ -212,11 +215,19 @@ jobs:
             echo "⚠ Segment assignments file not found: $SEGMENT_CSV"
           fi
 
+          # Add bundle metadata CSV
+          if [ -f "$METADATA_CSV" ]; then
+            git add "$METADATA_CSV"
+            echo "✓ Added bundle metadata file: $METADATA_CSV"
+          else
+            echo "⚠ Bundle metadata file not found: $METADATA_CSV"
+          fi
+
           # Only commit if there are changes
           if git diff --staged --quiet; then
             echo "No changes to commit (files already exist)"
           else
-            git commit -m "Add plan and segment assignments for $DATE [automated]"
+            git commit -m "Add plan, segment assignments, and bundle metadata for $DATE [automated]"
             git push
             echo "✓ Plan files committed and pushed to repository"
           fi
@@ -291,5 +302,6 @@ jobs:
           name: plan-emit-logs-${{ steps.date.outputs.next_saturday }}
           path: |
             plan_output.log
+            outputs/plans/bundle_metadata_${{ steps.date.outputs.next_saturday }}.csv
             outputs/incoming/daily/${{ steps.date.outputs.next_saturday }}/*.csv
           retention-days: 30
