@@ -513,10 +513,10 @@ def run_plan(
         if not bundle_segs or len(bundle_segs) == 0:
             continue
 
-        # For each segment, assign Full/Partial/Control with probs (1/4, 1/2, 1/4)
+        # For each segment, assign Full/Partial/Control with probs (1/4, 1/4, 1/2)
         for segment_id in bundle_segs:
             # Draw assignment
-            arm_draw = rng.choice(['Full', 'Partial', 'Control'], p=[0.25, 0.5, 0.25])
+            arm_draw = rng.choice(['Full', 'Partial', 'Control'], p=[0.25, 0.25, 0.5])
 
             # For Partial, treated share is 0.5 (half of addresses)
             # For Full, treated share is 1.0 (all addresses)
