@@ -52,25 +52,6 @@ jobs:
           ls -lh data/raw/DataSD/
           echo "✓ Geospatial data ready (included in repository)"
 
-      - name: Download latest notification activities
-        run: |
-          echo "Downloading latest pothole data..."
-          python -c "
-          from utils.data_fetcher import fetch_latest_notification_activities
-          activities = fetch_latest_notification_activities(use_local=False, download_if_missing=True)
-          print(f'Downloaded {len(activities)} pothole records')
-          "
-
-      - name: Check historical plans (for bundle tracking)
-        run: |
-          echo "Historical plans for without-replacement sampling:"
-          if [ -d "outputs/plans" ]; then
-            ls -lh outputs/plans/bundles_plan_*.csv 2>/dev/null || echo "No historical plans found - this might be the first run"
-          else
-            echo "No plans directory - this might be the first run"
-            mkdir -p outputs/plans
-          fi
-
       - name: Calculate or use input date
         id: date
         run: |
@@ -87,6 +68,39 @@ jobs:
           fi
           echo "next_saturday=$TARGET_DATE" >> $GITHUB_OUTPUT
           echo "Target date: $TARGET_DATE"
+
+      - name: Download latest notification activities
+        run: |
+          DATE="${{ steps.date.outputs.next_saturday }}"
+          echo "Downloading latest pothole data for $DATE..."
+
+          # Create directory for historical notification activities
+          mkdir -p data/historical_notification_activities
+
+          # Download latest data
+          python -c "
+          from utils.data_fetcher import fetch_latest_notification_activities
+          activities = fetch_latest_notification_activities(use_local=False, download_if_missing=True)
+          print(f'Downloaded {len(activities)} pothole records')
+          "
+
+          # Save a dated copy for historical record
+          cp data/notification_activities.csv "data/historical_notification_activities/notification_activities_$DATE.csv"
+          echo "✓ Saved dated copy: data/historical_notification_activities/notification_activities_$DATE.csv"
+
+          # Show file info
+          ls -lh data/notification_activities.csv
+          ls -lh "data/historical_notification_activities/notification_activities_$DATE.csv"
+
+      - name: Check historical plans (for bundle tracking)
+        run: |
+          echo "Historical plans for without-replacement sampling:"
+          if [ -d "outputs/plans" ]; then
+            ls -lh outputs/plans/bundles_plan_*.csv 2>/dev/null || echo "No historical plans found - this might be the first run"
+          else
+            echo "No plans directory - this might be the first run"
+            mkdir -p outputs/plans
+          fi
 
       - name: Validate date (check exclusions and end date)
         run: |
@@ -194,11 +208,11 @@ jobs:
         run: |
           DATE="${{ steps.date.outputs.next_saturday }}"
           PLAN_CSV="${{ steps.plan.outputs.plan_csv }}"
-          SEGMENT_CSV="outputs/plans/segment_assignments_$DATE.csv"
           METADATA_CSV="outputs/plans/bundle_metadata_$DATE.csv"
+          NOTIFICATION_CSV="data/historical_notification_activities/notification_activities_$DATE.csv"
 
           echo "Committing plan files to repository..."
-          echo "This ensures future runs can track used bundles, segment assignments, and pothole metadata"
+          echo "This ensures future runs can track used bundles and historical pothole data"
 
           # Configure git
           git config user.name "github-actions[bot]"
@@ -206,14 +220,7 @@ jobs:
 
           # Add plan CSV
           git add "$PLAN_CSV"
-
-          # Add segment assignments CSV
-          if [ -f "$SEGMENT_CSV" ]; then
-            git add "$SEGMENT_CSV"
-            echo "✓ Added segment assignments file: $SEGMENT_CSV"
-          else
-            echo "⚠ Segment assignments file not found: $SEGMENT_CSV"
-          fi
+          echo "✓ Added plan file: $PLAN_CSV"
 
           # Add bundle metadata CSV
           if [ -f "$METADATA_CSV" ]; then
@@ -223,11 +230,19 @@ jobs:
             echo "⚠ Bundle metadata file not found: $METADATA_CSV"
           fi
 
+          # Add historical notification activities CSV
+          if [ -f "$NOTIFICATION_CSV" ]; then
+            git add "$NOTIFICATION_CSV"
+            echo "✓ Added historical notification activities: $NOTIFICATION_CSV"
+          else
+            echo "⚠ Historical notification activities file not found: $NOTIFICATION_CSV"
+          fi
+
           # Only commit if there are changes
           if git diff --staged --quiet; then
             echo "No changes to commit (files already exist)"
           else
-            git commit -m "Add plan, segment assignments, and bundle metadata for $DATE [automated]"
+            git commit -m "Add plan, bundle metadata, and notification activities snapshot for $DATE [automated]"
             git push
             echo "✓ Plan files committed and pushed to repository"
           fi
@@ -303,6 +318,7 @@ jobs:
           path: |
             plan_output.log
             data/notification_activities.csv
+            data/historical_notification_activities/notification_activities_${{ steps.date.outputs.next_saturday }}.csv
             outputs/plans/bundle_metadata_${{ steps.date.outputs.next_saturday }}.csv
             outputs/incoming/daily/${{ steps.date.outputs.next_saturday }}/*.csv
           retention-days: 30
