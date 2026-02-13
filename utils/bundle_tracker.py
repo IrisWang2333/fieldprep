@@ -140,8 +140,9 @@ def get_previous_week_conditional_bundles(
     activities_df: pd.DataFrame,
     bundles_df: pd.DataFrame,
     min_date: str = None,
-    max_date: str = None
-) -> Set[int]:
+    max_date: str = None,
+    return_all_dh: bool = False
+) -> Set[int] | Tuple[Set[int], Set[int]]:
     """
     Get conditional DH bundles from previous week's plan.
 
@@ -163,16 +164,21 @@ def get_previous_week_conditional_bundles(
     max_date : str, optional
         Maximum date (YYYY-MM-DD) to include. Plans after this date are excluded.
         Useful for limiting to same experiment phase (pilot or official).
+    return_all_dh : bool, optional
+        If True, return tuple of (conditional_bundles, all_dh_bundles).
+        If False, return only conditional_bundles (default for backward compatibility).
 
     Returns
     -------
     set of bundle IDs that were conditional DH in previous week
+    OR
+    tuple of (conditional_bundles, all_dh_bundles) if return_all_dh=True
     """
     plans = get_all_historical_plans(plan_dir, min_date=min_date, max_date=max_date)
 
     if not plans:
         print("  No historical plans found, cannot determine previous week's conditional bundles")
-        return set()
+        return (set(), set()) if return_all_dh else set()
 
     # Find the most recent plan before current_date
     current_dt = datetime.strptime(current_date, "%Y-%m-%d")
@@ -181,7 +187,7 @@ def get_previous_week_conditional_bundles(
 
     if not previous_plans:
         print("  No previous plans found, cannot determine previous week's conditional bundles")
-        return set()
+        return (set(), set()) if return_all_dh else set()
 
     # Get the most recent previous plan
     prev_date_str, prev_df = previous_plans[-1]
@@ -225,7 +231,10 @@ def get_previous_week_conditional_bundles(
     if conditional_from_prev:
         print(f"  Conditional bundle IDs: {sorted(conditional_from_prev)}")
 
-    return conditional_from_prev
+    if return_all_dh:
+        return conditional_from_prev, prev_dh_set
+    else:
+        return conditional_from_prev
 
 
 def filter_available_bundles(

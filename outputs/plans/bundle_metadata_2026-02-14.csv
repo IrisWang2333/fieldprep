@@ -1,0 +1,7 @@
+date,task,bundle_id,bundle_type,num_segments,num_potholes_in_preceding_week,segments_with_potholes
+2026-02-14,DH,3306,conditional,7,2,SS-013230-PV1
+2026-02-14,DH,1133,conditional,12,1,SS-009498-PV1
+2026-02-14,DH,3434,conditional,8,1,SS-004076-PV1
+2026-02-14,DH,5724,conditional,9,1,SS-019838-PV1
+2026-02-14,DH,1326,random,9,0,
+2026-02-14,DH,1715,random,6,0,

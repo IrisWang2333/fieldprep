@@ -415,17 +415,19 @@ def run_plan(
     all_bundle_ids_before_filter = set(all_candidates["bundle_id"].unique())
 
     # ============================================================================
-    # IMPORTANT: Get previous week's DH conditional bundles BEFORE filtering
-    # These bundles need to be exempt from without-replacement for D2DS reuse
+    # IMPORTANT: Get previous week's DH bundles BEFORE filtering
+    # - Conditional bundles are exempt from without-replacement for D2DS reuse
+    # - ALL DH bundles are used as fallback for D2DS if conditional < 4
     # ============================================================================
-    print(f"\n[D2DS Exemption] Checking previous week's DH conditional for D2DS reuse...")
-    prev_week_conditional = get_previous_week_conditional_bundles(
+    print(f"\n[D2DS Exemption] Checking previous week's DH bundles for D2DS reuse...")
+    prev_week_conditional, prev_week_dh_all = get_previous_week_conditional_bundles(
         plan_dir=plan_dir,
         current_date=date,
         activities_df=activities,
         bundles_df=g_dh,
         min_date=phase_min_date,  # Only look within current phase
-        max_date=phase_max_date   # Ensure we stay within phase
+        max_date=phase_max_date,  # Ensure we stay within phase
+        return_all_dh=True  # Get both conditional AND all DH bundles
     )
 
     # Filter out previously used bundles to ensure without-replacement
@@ -671,8 +673,10 @@ def run_plan(
 
         print(f"  Eligible bundles for D2DS random (had potholes in previous field work week): {len(eligible_for_d2ds_random)}")
 
-        # Use select_d2ds_bundles utility with PREVIOUS week's conditional bundles
-        # and eligible bundles as random pool
+        # Use select_d2ds_bundles utility with improved fallback logic:
+        # - Try to get 4 from previous week's DH conditional
+        # - If < 4 conditional, fill from previous week's ALL DH bundles
+        # - Random 2 prefer bundles with potholes, fall back to all if none available
         d2ds_selection = select_d2ds_bundles(
             conditional_bundles=prev_week_conditional,
             all_bundles=all_available_for_d2ds,
@@ -681,7 +685,8 @@ def run_plan(
             n_random=2,
             seed=rng.integers(0, 1e9),
             segment_col='segment_id',
-            eligible_bundles=eligible_for_d2ds_random  # Random D2DS conditional on last week potholes
+            eligible_bundles=eligible_for_d2ds_random,  # Random D2DS conditional on last week potholes
+            previous_week_dh_all=prev_week_dh_all  # ALL DH from prev week for fallback
         )
 
         sampled_d2ds_bundles = d2ds_selection['d2ds_all']

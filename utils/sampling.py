@@ -120,14 +120,17 @@ def select_d2ds_bundles(
     n_random=2,
     seed=None,
     segment_col='segment_id',
-    eligible_bundles=None
+    eligible_bundles=None,
+    previous_week_dh_all=None
 ):
     """
-    Select D2DS bundles.
+    Select D2DS bundles with improved fallback logic.
 
-    D2DS design:
-    - 4 bundles from conditional DH bundles (from PREVIOUS week's DH conditional)
-    - 2 additional random bundles (conditional on last week having at least 1 pothole)
+    D2DS design (improved):
+    - 4 bundles from previous week's DH conditional
+      * If < 4 conditional available, fill from previous week's ALL DH bundles (including random)
+    - 2 additional random bundles conditional on having potholes in preceding week
+      * If no bundles with potholes available, sample randomly from all available
 
     Total: 6 D2DS bundles
 
@@ -150,13 +153,17 @@ def select_d2ds_bundles(
     eligible_bundles : set or list, optional
         Bundle IDs that had potholes in last week (for random D2DS selection).
         If provided, random bundles will be sampled from this pool.
-        If None, falls back to sampling from all_bundles.
+        If None or empty, falls back to sampling from all_bundles.
+    previous_week_dh_all : set or list, optional
+        ALL DH bundles from previous week (conditional + random).
+        Used to fill deficit if conditional bundles < 4.
+        If None, falls back to random sampling from all_bundles.
 
     Returns
     -------
     dict
         {
-            'd2ds_conditional': list of bundle IDs from conditional DH,
+            'd2ds_conditional': list of bundle IDs from previous week's DH,
             'd2ds_random': list of random bundle IDs,
             'd2ds_all': list of all D2DS bundle IDs,
             'd2ds_segments': list of segments in all D2DS bundles
@@ -164,43 +171,76 @@ def select_d2ds_bundles(
     """
     rng = np.random.default_rng(seed)
 
-    print(f"\n[D2DS Selection] Selecting {n_from_conditional} from conditional + {n_random} random bundles")
-    print(f"  Random pool: {'eligible bundles (had potholes last week)' if eligible_bundles is not None else 'all bundles'}")
+    print(f"\n[D2DS Selection] Selecting {n_from_conditional} from previous week's DH + {n_random} random")
+    print(f"  Random pool: {'eligible bundles (had potholes)' if eligible_bundles is not None and len(eligible_bundles) > 0 else 'all bundles (no potholes available)'}")
 
-    # Take all conditional bundles for D2DS (up to n_from_conditional)
-    if len(conditional_bundles) < n_from_conditional:
-        print(f"  WARNING: Only {len(conditional_bundles)} conditional bundles available, need {n_from_conditional}")
-        d2ds_conditional = list(conditional_bundles)
-        # Compensate by sampling more random bundles to maintain total count
+    # Step 1: Select from previous week's DH conditional (up to n_from_conditional)
+    conditional_bundles = set(conditional_bundles) if conditional_bundles else set()
+    d2ds_conditional = list(conditional_bundles)[:n_from_conditional]
+
+    # Step 2: If conditional < 4, fill from previous week's ALL DH bundles
+    if len(d2ds_conditional) < n_from_conditional:
         deficit = n_from_conditional - len(d2ds_conditional)
-        n_random_adjusted = n_random + deficit
-        print(f"  Compensating by sampling {deficit} additional random bundles ({n_random} + {deficit} = {n_random_adjusted})")
+        print(f"  Only {len(d2ds_conditional)} conditional DH from previous week, need {n_from_conditional}")
+        print(f"  Filling {deficit} slots from previous week's ALL DH bundles (including random)")
+
+        if previous_week_dh_all and len(previous_week_dh_all) > 0:
+            # Try to fill from previous week's DH (both conditional and random)
+            previous_week_dh_all = set(previous_week_dh_all)
+            remaining_prev_dh = previous_week_dh_all - set(d2ds_conditional)
+
+            if len(remaining_prev_dh) >= deficit:
+                # Can fill completely from previous week's DH
+                additional = list(rng.choice(
+                    list(remaining_prev_dh),
+                    size=deficit,
+                    replace=False
+                ))
+                d2ds_conditional.extend(additional)
+                print(f"    Filled {deficit} from previous week's DH: {additional}")
+            elif len(remaining_prev_dh) > 0:
+                # Partially fill from previous week's DH
+                d2ds_conditional.extend(list(remaining_prev_dh))
+                still_needed = deficit - len(remaining_prev_dh)
+                print(f"    Filled {len(remaining_prev_dh)} from previous week's DH")
+                print(f"    Still need {still_needed} more (will add to random pool)")
+                # Add remaining to random pool
+                n_random = n_random + still_needed
+            else:
+                print(f"    No additional DH bundles from previous week available")
+                print(f"    Adding {deficit} to random pool")
+                n_random = n_random + deficit
+        else:
+            # No previous week DH available, add deficit to random pool
+            print(f"    No previous week DH data available, adding {deficit} to random pool")
+            n_random = n_random + deficit
+
+    print(f"  D2DS from previous week's DH: {len(d2ds_conditional)} bundles")
+    print(f"  D2DS random slots: {n_random} bundles")
+
+    # Step 3: Sample random bundles
+    # Prefer eligible bundles (with potholes), fall back to all bundles if none available
+    if eligible_bundles and len(eligible_bundles) > 0:
+        random_pool = set(eligible_bundles) - set(d2ds_conditional)
+        random_source = "eligible (with potholes)"
     else:
-        # Use all conditional bundles (up to n_from_conditional)
-        d2ds_conditional = list(conditional_bundles)[:n_from_conditional]
-        n_random_adjusted = n_random
+        random_pool = set(all_bundles) - set(d2ds_conditional)
+        random_source = "all available (no potholes available)"
 
-    print(f"  D2DS from conditional: {len(d2ds_conditional)}")
+    print(f"  Random pool: {random_source}, {len(random_pool)} bundles")
 
-    # Sample additional random bundles (conditional on last week having pothole)
-    # Use eligible_bundles if provided, otherwise use all_bundles
-    random_pool = set(eligible_bundles) if eligible_bundles is not None else set(all_bundles)
-    remaining_bundles = random_pool - set(d2ds_conditional)
-
-    print(f"  Random pool size: {len(random_pool)}")
-    print(f"  Available after excluding conditional: {len(remaining_bundles)}")
-
-    if len(remaining_bundles) < n_random_adjusted:
-        print(f"  WARNING: Only {len(remaining_bundles)} bundles remain for random D2DS, need {n_random_adjusted}")
-        d2ds_random = list(remaining_bundles)
+    if len(random_pool) < n_random:
+        print(f"  WARNING: Only {len(random_pool)} bundles in random pool, need {n_random}")
+        d2ds_random = list(random_pool)
+        print(f"  Taking all {len(d2ds_random)} available bundles")
     else:
         d2ds_random = list(rng.choice(
-            list(remaining_bundles),
-            size=n_random_adjusted,
+            list(random_pool),
+            size=n_random,
             replace=False
         ))
 
-    print(f"  D2DS random (from eligible pool): {len(d2ds_random)}")
+    print(f"  D2DS random: {len(d2ds_random)} bundles")
 
     # Combine
     d2ds_all = d2ds_conditional + d2ds_random
