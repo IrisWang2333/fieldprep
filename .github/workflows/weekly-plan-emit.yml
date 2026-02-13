@@ -295,13 +295,14 @@ jobs:
           echo "❌ Weekly plan and emit failed for $DATE"
           echo "Check the logs for details"
 
-      - name: Archive logs
+      - name: Archive logs and data
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: plan-emit-logs-${{ steps.date.outputs.next_saturday }}
           path: |
             plan_output.log
+            data/notification_activities.csv
             outputs/plans/bundle_metadata_${{ steps.date.outputs.next_saturday }}.csv
             outputs/incoming/daily/${{ steps.date.outputs.next_saturday }}/*.csv
           retention-days: 30
