@@ -667,11 +667,15 @@ def run_emit(date: str, plan_csv: str, bundle_file: str | None = None, addr_assi
 
             # Merge segment assignments into pts_task
             pts_task_dh = pts_task.loc[is_dh].copy()
+
+            # IMPORTANT: Save original index before merge, as merge resets index
+            pts_task_dh = pts_task_dh.reset_index()  # Move index to a column
             pts_task_dh = pts_task_dh.merge(
                 segment_assignments[["segment_id", "dh_arm", "treated_share"]],
                 on="segment_id",
                 how="left"
             )
+            pts_task_dh = pts_task_dh.set_index('index')  # Restore original index
 
             # For each segment, apply its assignment
             for (ivw, seg_id), g in pts_task_dh.groupby(["interviewer", "segment_id"], dropna=False):
