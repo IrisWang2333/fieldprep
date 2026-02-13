@@ -209,10 +209,11 @@ jobs:
           DATE="${{ steps.date.outputs.next_saturday }}"
           PLAN_CSV="${{ steps.plan.outputs.plan_csv }}"
           METADATA_CSV="outputs/plans/bundle_metadata_$DATE.csv"
+          SEGMENT_CSV="outputs/plans/segment_assignments_$DATE.csv"
           NOTIFICATION_CSV="data/historical_notification_activities/notification_activities_$DATE.csv"
 
           echo "Committing plan files to repository..."
-          echo "This ensures future runs can track used bundles and historical pothole data"
+          echo "This ensures future runs can track used bundles, segment assignments, and historical pothole data"
 
           # Configure git
           git config user.name "github-actions[bot]"
@@ -230,6 +231,14 @@ jobs:
             echo "⚠ Bundle metadata file not found: $METADATA_CSV"
           fi
 
+          # Add segment assignments CSV
+          if [ -f "$SEGMENT_CSV" ]; then
+            git add "$SEGMENT_CSV"
+            echo "✓ Added segment assignments file: $SEGMENT_CSV"
+          else
+            echo "⚠ Segment assignments file not found: $SEGMENT_CSV"
+          fi
+
           # Add historical notification activities CSV
           if [ -f "$NOTIFICATION_CSV" ]; then
             git add "$NOTIFICATION_CSV"
@@ -242,7 +251,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit (files already exist)"
           else
-            git commit -m "Add plan, bundle metadata, and notification activities snapshot for $DATE [automated]"
+            git commit -m "Add plan, bundle metadata, segment assignments, and notification activities for $DATE [automated]"
             git push
             echo "✓ Plan files committed and pushed to repository"
           fi
