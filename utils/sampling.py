@@ -219,7 +219,7 @@ def select_d2ds_bundles(
     print(f"  D2DS random slots: {n_random} bundles")
 
     # Step 3: Sample random bundles
-    # Prefer eligible bundles (with potholes), fall back to all bundles if none available
+    # Prefer eligible bundles (with potholes), fall back to all bundles if not enough
     if eligible_bundles and len(eligible_bundles) > 0:
         random_pool = set(eligible_bundles) - set(d2ds_conditional)
         random_source = "eligible (with potholes)"
@@ -229,18 +229,43 @@ def select_d2ds_bundles(
 
     print(f"  Random pool: {random_source}, {len(random_pool)} bundles")
 
-    if len(random_pool) < n_random:
-        print(f"  WARNING: Only {len(random_pool)} bundles in random pool, need {n_random}")
-        d2ds_random = list(random_pool)
-        print(f"  Taking all {len(d2ds_random)} available bundles")
-    else:
+    # Sample from random pool, with fallback to all bundles if not enough
+    if len(random_pool) >= n_random:
+        # Enough bundles in preferred pool
         d2ds_random = list(rng.choice(
             list(random_pool),
             size=n_random,
             replace=False
         ))
+        print(f"  D2DS random: {len(d2ds_random)} bundles (all from {random_source})")
+    else:
+        # Not enough in preferred pool - take all from preferred, fill from all bundles
+        d2ds_random = list(random_pool)
+        deficit = n_random - len(d2ds_random)
 
-    print(f"  D2DS random: {len(d2ds_random)} bundles")
+        if deficit > 0:
+            print(f"  WARNING: Only {len(random_pool)} bundles in {random_source} pool, need {n_random}")
+            print(f"  Taking all {len(d2ds_random)} from {random_source}")
+            print(f"  Filling {deficit} more from all available bundles")
+
+            # Fill deficit from all bundles (excluding already selected)
+            remaining_all = set(all_bundles) - set(d2ds_conditional) - set(d2ds_random)
+
+            if len(remaining_all) >= deficit:
+                additional = list(rng.choice(
+                    list(remaining_all),
+                    size=deficit,
+                    replace=False
+                ))
+                d2ds_random.extend(additional)
+                print(f"  Added {len(additional)} bundles from all available")
+            else:
+                # Even all bundles not enough - take what we can
+                d2ds_random.extend(list(remaining_all))
+                print(f"  WARNING: Only {len(remaining_all)} additional bundles available")
+                print(f"  Total D2DS random: {len(d2ds_random)}/{n_random}")
+
+        print(f"  D2DS random: {len(d2ds_random)} bundles (mixed sources)")
 
     # Combine
     d2ds_all = d2ds_conditional + d2ds_random
