@@ -57,14 +57,16 @@ cd "/Users/iris/Dropbox/sandiego code/code/fieldprep"
 
 发布后，你会得到类似这样的下载链接：
 ```
-https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v1.0-data/geospatial_data.tar.gz
+https://github.com/IrisWang2333/fieldprep/releases/download/v1.0-data/geospatial_data.tar.gz
 ```
 
-**重要**: 编辑 `.github/workflows/weekly-plan-emit.yml` 文件第 41 行，替换 `YOUR_USERNAME` 和 `YOUR_REPO` 为你的实际 GitHub 用户名和仓库名。
+**重要**: 确认 `.github/workflows/weekly-plan-emit.yml` 文件中的 Release URL 已使用正确的仓库名 `IrisWang2333/fieldprep`。
 
 ---
 
-## 2. 配置 Google Drive API
+## 2. 配置 Google Drive API（OAuth 方式）
+
+> **注意**：当前工作流使用 **OAuth2 凭证**，而非 Service Account。以下步骤基于此方式。
 
 ### 步骤 2.1: 创建 Google Cloud 项目
 
@@ -78,50 +80,31 @@ https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v1.0-data/geospatia
 2. 搜索 **"Google Drive API"**
 3. 点击 **"Enable"**
 
-### 步骤 2.3: 创建服务账户
+### 步骤 2.3: 创建 OAuth2 凭证
 
 1. 进入 **"APIs & Services"** → **"Credentials"**
-2. 点击 **"Create Credentials"** → **"Service Account"**
-3. 填写信息：
-   - **Service account name**: `fieldprep-uploader`
-   - **Service account ID**: 自动生成
-   - **Description**: `Automated upload to Google Drive`
-4. 点击 **"Create and Continue"**
-5. **Role**: 选择 **"Editor"** 或跳过（不需要项目级权限）
-6. 点击 **"Done"**
+2. 点击 **"Create Credentials"** → **"OAuth client ID"**
+3. 应用类型选择 **"Desktop app"**
+4. 填写名称（如 `fieldprep-uploader`）
+5. 点击 **"Create"** → 下载 JSON 凭证文件
 
-### 步骤 2.4: 下载服务账户密钥
+### 步骤 2.4: 生成 OAuth Token
 
-1. 在 Credentials 页面，找到刚创建的服务账户
-2. 点击服务账户邮箱（类似 `fieldprep-uploader@xxx.iam.gserviceaccount.com`）
-3. 进入 **"Keys"** 标签
-4. 点击 **"Add Key"** → **"Create new key"**
-5. 选择 **JSON** 格式
-6. 点击 **"Create"** → JSON 文件会自动下载
-
-**保存好这个 JSON 文件！** 你需要它的内容来配置 GitHub Secrets。
-
-### 步骤 2.5: 共享 Google Drive 文件夹
-
-1. 打开你的 Google Drive 文件夹: https://drive.google.com/drive/u/2/folders/17Eexa-x7fOIB0gOu63SWUkZlNSr5oyk8
-2. 右键点击文件夹 → **"Share"**
-3. 添加服务账户邮箱（从步骤 2.4 复制）: `fieldprep-uploader@xxx.iam.gserviceaccount.com`
-4. 权限选择: **"Editor"**
-5. **取消勾选** "Notify people"（服务账户不需要通知）
-6. 点击 **"Share"**
+1. 使用下载的 JSON 文件在本地运行认证流程，生成含 access_token/refresh_token 的凭证文件
+2. **保存好这个凭证 JSON 文件**，需要用它来配置 GitHub Secrets
 
 ---
 
 ## 3. 配置 GitHub Secrets
 
-### 步骤 3.1: 添加 GOOGLE_DRIVE_CREDENTIALS
+### 步骤 3.1: 添加 GOOGLE_DRIVE_OAUTH_CREDENTIALS
 
 1. 进入 GitHub 仓库
 2. 点击 **"Settings"** → **"Secrets and variables"** → **"Actions"**
 3. 点击 **"New repository secret"**
 4. 填写：
-   - **Name**: `GOOGLE_DRIVE_CREDENTIALS`
-   - **Secret**: 粘贴步骤 2.4 下载的整个 JSON 文件内容（包括所有花括号和引号）
+   - **Name**: `GOOGLE_DRIVE_OAUTH_CREDENTIALS`
+   - **Secret**: 粘贴步骤 2.4 生成的 OAuth 凭证 JSON 内容（包含 access_token 和 refresh_token）
 5. 点击 **"Add secret"**
 
 ### 步骤 3.2: 添加 GOOGLE_DRIVE_FOLDER_ID
@@ -129,7 +112,15 @@ https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v1.0-data/geospatia
 1. 点击 **"New repository secret"**
 2. 填写：
    - **Name**: `GOOGLE_DRIVE_FOLDER_ID`
-   - **Secret**: `17Eexa-x7fOIB0gOu63SWUkZlNSr5oyk8`
+   - **Secret**: `17Eexa-x7fOIB0gOu63SWUkZlNSr5oyk8`（field files 文件夹）
+3. 点击 **"Add secret"**
+
+### 步骤 3.3: 添加 GOOGLE_DRIVE_ROUTING_FOLDER_ID
+
+1. 点击 **"New repository secret"**
+2. 填写：
+   - **Name**: `GOOGLE_DRIVE_ROUTING_FOLDER_ID`
+   - **Secret**: routing files 对应的 Google Drive 文件夹 ID
 3. 点击 **"Add secret"**
 
 ---
@@ -140,17 +131,12 @@ https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v1.0-data/geospatia
 
 ```yaml
 # 第 41 行附近
-RELEASE_URL="https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v1.0-data/geospatial_data.tar.gz"
-```
-
-替换为你的实际值，例如：
-```yaml
-RELEASE_URL="https://github.com/iris-research/fieldprep/releases/download/v1.0-data/geospatial_data.tar.gz"
+RELEASE_URL="https://github.com/IrisWang2333/fieldprep/releases/download/v1.0-data/geospatial_data.tar.gz"
 ```
 
 提交更改：
 ```bash
-cd "/Users/iris/Dropbox/sandiego code/code/fieldprep"
+cd "/Users/iris/Dropbox/SanDiego311/code/fieldprep"
 git add .github/workflows/weekly-plan-emit.yml
 git commit -m "Update workflow with correct GitHub repository URL"
 git push
@@ -211,9 +197,9 @@ git push
 **错误**: `403 Forbidden` 或 `HttpError 403`
 
 **解决方案**:
-- 确认服务账户已被添加到 Google Drive 文件夹（步骤 2.5）
-- 检查权限是否为 "Editor"
-- 重新下载服务账户 JSON 密钥并更新 GitHub Secret
+- 确认 `GOOGLE_DRIVE_OAUTH_CREDENTIALS` secret 内容正确（包含 access_token 和 refresh_token）
+- 确认 `GOOGLE_DRIVE_FOLDER_ID` 和 `GOOGLE_DRIVE_ROUTING_FOLDER_ID` secrets 已设置
+- 检查 OAuth token 是否过期，必要时重新生成并更新 secret
 
 ### 问题 3: 路径错误
 
@@ -231,9 +217,8 @@ git push
 - [ ] 运行 `./scripts/package_data.sh` 成功
 - [ ] 上传 `geospatial_data.tar.gz` 到 GitHub Releases (tag: v1.0-data)
 - [ ] 创建 Google Cloud 项目并启用 Drive API
-- [ ] 创建服务账户并下载 JSON 密钥
-- [ ] 共享 Google Drive 文件夹给服务账户
-- [ ] 添加 GitHub Secrets: `GOOGLE_DRIVE_CREDENTIALS` 和 `GOOGLE_DRIVE_FOLDER_ID`
+- [ ] 创建 OAuth2 凭证并生成含 token 的凭证文件
+- [ ] 添加 GitHub Secrets: `GOOGLE_DRIVE_OAUTH_CREDENTIALS`、`GOOGLE_DRIVE_FOLDER_ID`、`GOOGLE_DRIVE_ROUTING_FOLDER_ID`
 - [ ] 更新 `.github/workflows/weekly-plan-emit.yml` 中的 GitHub 仓库 URL
 - [ ] 手动触发工作流程测试成功
 - [ ] 验证文件已上传到 Google Drive

@@ -42,6 +42,9 @@ from utils.bundle_tracker import (
 from sd311_fieldprep.assign_bundles_nearest_then_refine import (
     assign_bundles_for_date_nearest_then_refine
 )
+from sd311_fieldprep.assign_bundles_dh_d2ds_joint import (
+    assign_bundles_for_date_dh_d2ds_joint
+)
 from sd311_fieldprep.assign_bundles_minimax import (
     get_interviewers_for_date
 )
@@ -552,108 +555,10 @@ def run_plan(
         print(f"  No segment assignments to save (no DH bundles sampled)")
 
     # ============================================================================
-    # Optimize bundle-to-interviewer assignment using interviewer-aware bisection
+    # Note: Assignment optimization moved to after D2DS sampling (if Week 2+)
+    # For Week 1 (DH only), assignment will happen below
+    # For Week 2+ (DH + D2DS), joint optimization will happen after D2DS sampling
     # ============================================================================
-    print(f"\n[Assignment Optimization] Assigning DH bundles to interviewers using interviewer-aware bisection...")
-
-    try:
-        # Calculate bundles per interviewer
-        bundles_per_interviewer = len(sampled_dh_bundles) // len(interviewers)
-
-        # Use nearest-then-refine (best algorithm: 53.6% better than baseline)
-        geocoded_file = root / "data" / "interviewers_geocoded.csv"
-
-        dh_assignments = assign_bundles_for_date_nearest_then_refine(
-            date=date,
-            bundles=list(sampled_dh_bundles),
-            bundles_gdf=g_dh,
-            geocoded_file=str(geocoded_file) if geocoded_file.exists() else None,
-            bundles_per_interviewer=bundles_per_interviewer,
-            max_refine_iterations=50  # Iterative refinement to minimize max travel distance
-        )
-
-        print(f"[Assignment Optimization] Successfully assigned DH bundles using nearest-then-refine")
-
-        # Print travel time summary
-        max_travel_time = 0
-        for name, (_, travel_time) in dh_assignments.items():
-            print(f"  {name}: {travel_time:.2f} km")
-            max_travel_time = max(max_travel_time, travel_time)
-        print(f"  Maximum travel time: {max_travel_time:.2f} km")
-
-        # Create name-to-code mapping (assignments returns real names, but we need codes A-F)
-        real_names = get_interviewers_for_date(date)
-        name_to_code = {real_names[i]: interviewers[i] for i in range(len(interviewers))}
-
-        # Create rows from optimized assignments
-        for interviewer_name, (bundle_ids, _) in dh_assignments.items():
-            # Map real name back to code (A-F)
-            interviewer_code = name_to_code.get(interviewer_name, interviewer_name)
-            for bundle_id in bundle_ids:
-                # Get bundle details
-                bundle_row = dh_details[dh_details['bundle_id'] == bundle_id]
-                if len(bundle_row) == 0:
-                    print(f"  WARNING: Bundle {bundle_id} not found in candidates, skipping")
-                    continue
-
-                n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
-                seg_list = bundle_row['_seg_ids'].iloc[0]
-
-                # Determine bundle type
-                if bundle_id in dh_conditional_bundles:
-                    bundle_type = "conditional"
-                else:
-                    bundle_type = "random"
-
-                rows.append({
-                    "date": date,
-                    "interviewer": interviewer_code,
-                    "task": "DH",
-                    "bundle_id": int(bundle_id),
-                    "bundle_type": bundle_type,
-                    "list_code": int(list_code),
-                    "sfh_bundle_total": n_sfh,
-                })
-
-                # Mark segments as used
-                used_seg_ids.update({str(x) for x in (seg_list or [])})
-
-    except Exception as e:
-        print(f"[Assignment Optimization] Warning: Distance-based assignment failed: {e}")
-        print(f"[Assignment Optimization] Falling back to simple round-robin assignment")
-
-        # Fallback to simple assignment
-        for i, bundle_id in enumerate(sampled_dh_bundles):
-            # Get interviewer (cycle through if we have more bundles than interviewers)
-            ivw = interviewers[i % len(interviewers)]
-
-            # Get bundle details
-            bundle_row = dh_details[dh_details['bundle_id'] == bundle_id]
-            if len(bundle_row) == 0:
-                print(f"  WARNING: Bundle {bundle_id} not found in candidates, skipping")
-                continue
-
-            n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
-            seg_list = bundle_row['_seg_ids'].iloc[0]
-
-            # Determine bundle type
-            if bundle_id in dh_conditional_bundles:
-                bundle_type = "conditional"
-            else:
-                bundle_type = "random"
-
-            rows.append({
-                "date": date,
-                "interviewer": ivw,
-                "task": "DH",
-                "bundle_id": int(bundle_id),
-                "bundle_type": bundle_type,
-                "list_code": int(list_code),
-                "sfh_bundle_total": n_sfh,
-            })
-
-            # Mark segments as used
-            used_seg_ids.update({str(x) for x in (seg_list or [])})
 
     # ============================================================================
     # D2DS Sampling (only if not Week 1)
@@ -709,120 +614,218 @@ def run_plan(
         d2ds_details = all_candidates[all_candidates['bundle_id'].isin(sampled_d2ds_bundles)].copy()
 
         # ============================================================================
-        # Optimize D2DS bundle-to-interviewer assignment using nearest-then-refine
+        # Joint DH+D2DS Assignment Optimization
         # ============================================================================
-        print(f"\n[Assignment Optimization] Assigning D2DS bundles to interviewers using nearest-then-refine...")
+        print(f"\n[Assignment Optimization] Using joint DH+D2DS optimization...")
+        print(f"  Optimizing both DH and D2DS assignments simultaneously")
+        print(f"  Distance = Home → DH centroid + DH centroid → D2DS centroid")
 
         try:
-            # Calculate bundles per interviewer
-            bundles_per_interviewer_d2ds = len(sampled_d2ds_bundles) // len(interviewers)
-
-            # Use nearest-then-refine (best algorithm: 53.6% better than baseline)
+            # Use joint DH+D2DS optimization
             geocoded_file = root / "data" / "interviewers_geocoded.csv"
 
-            d2ds_assignments = assign_bundles_for_date_nearest_then_refine(
+            joint_assignments = assign_bundles_for_date_dh_d2ds_joint(
                 date=date,
-                bundles=list(sampled_d2ds_bundles),
+                dh_bundles=list(sampled_dh_bundles),
+                d2ds_bundles=list(sampled_d2ds_bundles),
                 bundles_gdf=g_dh,
-                geocoded_file=str(geocoded_file) if geocoded_file.exists() else None,
-                bundles_per_interviewer=bundles_per_interviewer_d2ds,
-                max_refine_iterations=50  # Iterative refinement to minimize max travel distance
+                max_refine_iterations=100
             )
 
-            print(f"[Assignment Optimization] Successfully assigned D2DS bundles using nearest-then-refine")
-
-            # Print travel time summary
-            max_travel_time_d2ds = 0
-            for name, (_, travel_time) in d2ds_assignments.items():
-                print(f"  {name}: {travel_time:.2f} km")
-                max_travel_time_d2ds = max(max_travel_time_d2ds, travel_time)
-            print(f"  Maximum travel time: {max_travel_time_d2ds:.2f} km")
+            print(f"[Assignment Optimization] Successfully assigned bundles using joint optimization")
 
             # Create name-to-code mapping (assignments returns real names, but we need codes A-F)
-            real_names_d2ds = get_interviewers_for_date(date)
-            name_to_code_d2ds = {real_names_d2ds[i]: interviewers[i] for i in range(len(interviewers))}
+            real_names = get_interviewers_for_date(date)
+            name_to_code = {real_names[i]: interviewers[i] for i in range(len(interviewers))}
 
-            # Create rows from optimized assignments
-            for interviewer_name, (bundle_ids, _) in d2ds_assignments.items():
-                # Map real name back to code (A-F)
-                interviewer_code = name_to_code_d2ds.get(interviewer_name, interviewer_name)
-                for bundle_id in bundle_ids:
-                    # Get bundle details (from either d2ds_conditional or d2ds_random)
-                    if bundle_id in d2ds_conditional:
-                        bundle_row = all_candidates[all_candidates['bundle_id'] == bundle_id]
-                    else:
-                        bundle_row = d2ds_details[d2ds_details['bundle_id'] == bundle_id]
+            # Create rows from joint assignments
+            # joint_assignments format: {interviewer_name: (dh_bundle_id, d2ds_bundle_id, travel_distance)}
+            for interviewer_name, (dh_bundle_id, d2ds_bundle_id, travel_dist) in joint_assignments.items():
+                interviewer_code = name_to_code.get(interviewer_name, interviewer_name)
 
-                    if len(bundle_row) == 0:
-                        print(f"  WARNING: Bundle {bundle_id} not found in candidates, skipping")
-                        continue
-
+                # Add DH row
+                bundle_row = dh_details[dh_details['bundle_id'] == dh_bundle_id]
+                if len(bundle_row) == 0:
+                    print(f"  WARNING: DH Bundle {dh_bundle_id} not found in candidates, skipping")
+                else:
                     n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
-                    seg_list = bundle_row['_seg_ids'].iloc[0] if bundle_id in d2ds_random else []
+                    seg_list = bundle_row['_seg_ids'].iloc[0]
+                    bundle_type = "conditional" if dh_bundle_id in dh_conditional_bundles else "random"
 
-                    # Determine bundle type
-                    if bundle_id in d2ds_conditional:
-                        bundle_type = "d2ds_conditional"
-                    else:
-                        bundle_type = "d2ds_random"
+                    rows.append({
+                        "date": date,
+                        "interviewer": interviewer_code,
+                        "task": "DH",
+                        "bundle_id": int(dh_bundle_id),
+                        "bundle_type": bundle_type,
+                        "list_code": int(list_code),
+                        "sfh_bundle_total": n_sfh,
+                    })
+                    used_seg_ids.update({str(x) for x in (seg_list or [])})
+
+                # Add D2DS row
+                if d2ds_bundle_id in d2ds_conditional:
+                    bundle_row = all_candidates[all_candidates['bundle_id'] == d2ds_bundle_id]
+                else:
+                    bundle_row = d2ds_details[d2ds_details['bundle_id'] == d2ds_bundle_id]
+
+                if len(bundle_row) == 0:
+                    print(f"  WARNING: D2DS Bundle {d2ds_bundle_id} not found in candidates, skipping")
+                else:
+                    n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
+                    seg_list = bundle_row['_seg_ids'].iloc[0] if d2ds_bundle_id in d2ds_random else []
+                    bundle_type = "d2ds_conditional" if d2ds_bundle_id in d2ds_conditional else "d2ds_random"
 
                     rows.append({
                         "date": date,
                         "interviewer": interviewer_code,
                         "task": "D2DS",
+                        "bundle_id": int(d2ds_bundle_id),
+                        "bundle_type": bundle_type,
+                        "list_code": int(list_code),
+                        "sfh_bundle_total": n_sfh,
+                    })
+                    if d2ds_bundle_id in d2ds_random:
+                        used_seg_ids.update({str(x) for x in (seg_list or [])})
+
+        except Exception as e:
+            print(f"[Assignment Optimization] Warning: Joint assignment failed: {e}")
+            print(f"[Assignment Optimization] Falling back to simple round-robin assignment")
+
+            # Fallback: simple round-robin for both DH and D2DS
+            for i in range(len(interviewers)):
+                ivw = interviewers[i]
+
+                # DH bundle
+                if i < len(sampled_dh_bundles):
+                    dh_bundle_id = list(sampled_dh_bundles)[i]
+                    bundle_row = dh_details[dh_details['bundle_id'] == dh_bundle_id]
+                    if len(bundle_row) > 0:
+                        n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
+                        seg_list = bundle_row['_seg_ids'].iloc[0]
+                        bundle_type = "conditional" if dh_bundle_id in dh_conditional_bundles else "random"
+                        rows.append({
+                            "date": date,
+                            "interviewer": ivw,
+                            "task": "DH",
+                            "bundle_id": int(dh_bundle_id),
+                            "bundle_type": bundle_type,
+                            "list_code": int(list_code),
+                            "sfh_bundle_total": n_sfh,
+                        })
+                        used_seg_ids.update({str(x) for x in (seg_list or [])})
+
+                # D2DS bundle
+                if i < len(sampled_d2ds_bundles):
+                    d2ds_bundle_id = list(sampled_d2ds_bundles)[i]
+                    if d2ds_bundle_id in d2ds_conditional:
+                        bundle_row = all_candidates[all_candidates['bundle_id'] == d2ds_bundle_id]
+                    else:
+                        bundle_row = d2ds_details[d2ds_details['bundle_id'] == d2ds_bundle_id]
+
+                    if len(bundle_row) > 0:
+                        n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
+                        seg_list = bundle_row['_seg_ids'].iloc[0] if d2ds_bundle_id in d2ds_random else []
+                        bundle_type = "d2ds_conditional" if d2ds_bundle_id in d2ds_conditional else "d2ds_random"
+                        rows.append({
+                            "date": date,
+                            "interviewer": ivw,
+                            "task": "D2DS",
+                            "bundle_id": int(d2ds_bundle_id),
+                            "bundle_type": bundle_type,
+                            "list_code": int(list_code),
+                            "sfh_bundle_total": n_sfh,
+                        })
+                        if d2ds_bundle_id in d2ds_random:
+                            used_seg_ids.update({str(x) for x in (seg_list or [])})
+
+    elif is_week_1:
+        print(f"\n[D2DS Sampling] Skipped (Week 1 has no D2DS)")
+
+        # ============================================================================
+        # DH-only Assignment (Week 1)
+        # ============================================================================
+        print(f"\n[Assignment Optimization] Assigning DH bundles (Week 1 - DH only)...")
+
+        try:
+            # Calculate bundles per interviewer
+            bundles_per_interviewer = len(sampled_dh_bundles) // len(interviewers)
+
+            # Use nearest-then-refine for DH-only assignment
+            geocoded_file = root / "data" / "interviewers_geocoded.csv"
+
+            dh_assignments = assign_bundles_for_date_nearest_then_refine(
+                date=date,
+                bundles=list(sampled_dh_bundles),
+                bundles_gdf=g_dh,
+                geocoded_file=str(geocoded_file) if geocoded_file.exists() else None,
+                bundles_per_interviewer=bundles_per_interviewer,
+                max_refine_iterations=50
+            )
+
+            print(f"[Assignment Optimization] Successfully assigned DH bundles using nearest-then-refine")
+
+            # Print travel time summary
+            max_travel_time = 0
+            for name, (_, travel_time) in dh_assignments.items():
+                print(f"  {name}: {travel_time:.2f} km")
+                max_travel_time = max(max_travel_time, travel_time)
+            print(f"  Maximum travel time: {max_travel_time:.2f} km")
+
+            # Create name-to-code mapping
+            real_names = get_interviewers_for_date(date)
+            name_to_code = {real_names[i]: interviewers[i] for i in range(len(interviewers))}
+
+            # Create rows from optimized assignments
+            for interviewer_name, (bundle_ids, _) in dh_assignments.items():
+                interviewer_code = name_to_code.get(interviewer_name, interviewer_name)
+                for bundle_id in bundle_ids:
+                    bundle_row = dh_details[dh_details['bundle_id'] == bundle_id]
+                    if len(bundle_row) == 0:
+                        print(f"  WARNING: Bundle {bundle_id} not found in candidates, skipping")
+                        continue
+
+                    n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
+                    seg_list = bundle_row['_seg_ids'].iloc[0]
+                    bundle_type = "conditional" if bundle_id in dh_conditional_bundles else "random"
+
+                    rows.append({
+                        "date": date,
+                        "interviewer": interviewer_code,
+                        "task": "DH",
                         "bundle_id": int(bundle_id),
                         "bundle_type": bundle_type,
                         "list_code": int(list_code),
                         "sfh_bundle_total": n_sfh,
                     })
-
-                    # Mark segments as used (only for random bundles, conditional already marked)
-                    if bundle_id in d2ds_random:
-                        used_seg_ids.update({str(x) for x in (seg_list or [])})
+                    used_seg_ids.update({str(x) for x in (seg_list or [])})
 
         except Exception as e:
-            print(f"[Assignment Optimization] Warning: Distance-based D2DS assignment failed: {e}")
+            print(f"[Assignment Optimization] Warning: Distance-based assignment failed: {e}")
             print(f"[Assignment Optimization] Falling back to simple round-robin assignment")
 
             # Fallback to simple assignment
-            for i, bundle_id in enumerate(sampled_d2ds_bundles):
+            for i, bundle_id in enumerate(sampled_dh_bundles):
                 ivw = interviewers[i % len(interviewers)]
-
-                # Get bundle details (from either d2ds_conditional or d2ds_random)
-                if bundle_id in d2ds_conditional:
-                    bundle_row = all_candidates[all_candidates['bundle_id'] == bundle_id]
-                else:
-                    bundle_row = d2ds_details[d2ds_details['bundle_id'] == bundle_id]
-
+                bundle_row = dh_details[dh_details['bundle_id'] == bundle_id]
                 if len(bundle_row) == 0:
                     print(f"  WARNING: Bundle {bundle_id} not found in candidates, skipping")
                     continue
 
                 n_sfh = int(bundle_row['sfh_bundle_total'].iloc[0])
-                seg_list = bundle_row['_seg_ids'].iloc[0] if bundle_id in d2ds_random else []
-
-                # Determine bundle type
-                if bundle_id in d2ds_conditional:
-                    bundle_type = "d2ds_conditional"
-                else:
-                    bundle_type = "d2ds_random"
+                seg_list = bundle_row['_seg_ids'].iloc[0]
+                bundle_type = "conditional" if bundle_id in dh_conditional_bundles else "random"
 
                 rows.append({
                     "date": date,
                     "interviewer": ivw,
-                    "task": "D2DS",
+                    "task": "DH",
                     "bundle_id": int(bundle_id),
                     "bundle_type": bundle_type,
                     "list_code": int(list_code),
                     "sfh_bundle_total": n_sfh,
                 })
-
-                # Mark segments as used (only for random bundles, conditional already marked)
-                if bundle_id in d2ds_random:
-                    used_seg_ids.update({str(x) for x in (seg_list or [])})
-
-    elif is_week_1:
-        print(f"\n[D2DS Sampling] Skipped (Week 1 has no D2DS)")
+                used_seg_ids.update({str(x) for x in (seg_list or [])})
 
     plan = pd.DataFrame(rows).sort_values(["task", "interviewer"]).reset_index(drop=True)
 

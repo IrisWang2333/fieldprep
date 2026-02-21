@@ -6,7 +6,7 @@ Automated system for generating weekly field plans for pothole treatment experim
 
 This system implements a **single-layer randomization design** for door-to-door field experiments:
 
-- **Week 1**: 30 DH bundles (4 conditional + 26 random), no D2DS
+- **Week 1**: 24 DH bundles (4 conditional + 20 random), no D2DS
 - **Week 2+**: 6 DH bundles (4 conditional + 2 random) + 6 D2DS bundles (4 from DH conditional + 2 random)
 
 **Key Features:**
@@ -46,7 +46,7 @@ fieldprep/
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/fieldprep.git
+git clone https://github.com/IrisWang2333/fieldprep.git
 cd fieldprep
 ```
 
@@ -60,18 +60,18 @@ pip install -r requirements.txt
 
 For automated Google Drive uploads, configure these secrets in your GitHub repository:
 
-- `GOOGLE_DRIVE_CREDENTIALS`: Google Cloud service account JSON credentials
-- `GOOGLE_DRIVE_BUCKET`: Google Cloud Storage bucket name (e.g., `gs://your-bucket-name`)
+- `GOOGLE_DRIVE_OAUTH_CREDENTIALS`: Google Drive OAuth2 credentials JSON
+- `GOOGLE_DRIVE_FOLDER_ID`: Google Drive folder ID for field files (`17Eexa-x7fOIB0gOu63SWUkZlNSr5oyk8`)
+- `GOOGLE_DRIVE_ROUTING_FOLDER_ID`: Google Drive folder ID for routing files
 
-#### Setting up Google Cloud Storage:
+#### Setting up Google Drive OAuth:
 
-1. Create a Google Cloud project
-2. Enable Cloud Storage API
-3. Create a service account with Storage Admin role
-4. Download service account JSON key
-5. Create a Cloud Storage bucket
-6. Add the JSON key as GitHub secret `GOOGLE_DRIVE_CREDENTIALS`
-7. Add bucket name as GitHub secret `GOOGLE_DRIVE_BUCKET`
+1. Create a Google Cloud project and enable the Google Drive API
+2. Create OAuth2 credentials (Desktop app type)
+3. Download credentials JSON and authenticate to generate a token
+4. Add the OAuth credentials JSON as GitHub secret `GOOGLE_DRIVE_OAUTH_CREDENTIALS`
+5. Add the field files folder ID as GitHub secret `GOOGLE_DRIVE_FOLDER_ID`
+6. Add the routing folder ID as GitHub secret `GOOGLE_DRIVE_ROUTING_FOLDER_ID`
 
 ## Usage
 
@@ -143,9 +143,9 @@ A bundle is **eligible** if at least one segment in the bundle had a pothole rep
 ### Sampling Logic
 
 #### Week 1 (First week):
-- **30 DH bundles**:
+- **24 DH bundles**:
   - 4 conditional (from eligible bundles)
-  - 26 random (from all bundles)
+  - 20 random (from all bundles)
 - **0 D2DS bundles**
 
 #### Week 2+ (Subsequent weeks):
@@ -161,8 +161,8 @@ A bundle is **eligible** if at least one segment in the bundle had a pothole rep
 For each segment within DH bundles, the system assigns a treatment intensity arm:
 
 - **Full Treatment** (25% probability): All addresses in segment receive door hangers (treated_share = 1.0)
-- **Partial Treatment** (50% probability): Half of addresses in segment receive door hangers (treated_share = 0.5)
-- **Control** (25% probability): No addresses in segment receive door hangers (treated_share = 0.0)
+- **Partial Treatment** (25% probability): Half of addresses in segment receive door hangers (treated_share = 0.5)
+- **Control** (50% probability): No addresses in segment receive door hangers (treated_share = 0.0)
 
 Assignment is randomized independently for each segment using the specified seed.
 
@@ -184,6 +184,7 @@ Each bundle is used at most once throughout the entire experiment.
 Generated in `outputs/plans/`:
 
 - `bundles_plan_YYYY-MM-DD.csv`: Bundle assignments to interviewers
+- `bundle_metadata_YYYY-MM-DD.csv`: Bundle types and pothole details (conditional vs random, num_potholes)
 - `segment_assignments_YYYY-MM-DD.csv`: Segment-level DH treatment assignments (Full/Partial/Control)
 - `bundles_plan_YYYY-MM-DD.html`: Map visualization of selected bundles
 
@@ -275,9 +276,9 @@ run_emit(
 
 ### Google Drive upload failing
 
-- Verify `GOOGLE_DRIVE_CREDENTIALS` secret is set correctly
-- Check service account has Storage Admin role
-- Verify bucket name in `GOOGLE_DRIVE_BUCKET` secret
+- Verify `GOOGLE_DRIVE_OAUTH_CREDENTIALS` secret is set correctly
+- Verify `GOOGLE_DRIVE_FOLDER_ID` and `GOOGLE_DRIVE_ROUTING_FOLDER_ID` secrets are set correctly
+- Check that OAuth credentials are valid and not expired
 
 ### Not enough eligible bundles
 

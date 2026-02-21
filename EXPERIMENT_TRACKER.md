@@ -207,6 +207,37 @@ GitHub Actions → Weekly Plan and Emit → Run workflow
 
 ---
 
+## GitHub 配置
+
+**仓库**：`IrisWang2333/fieldprep`
+
+### GitHub Secrets（Settings → Secrets and variables → Actions）
+
+| Secret名称 | 用途 |
+|-----------|------|
+| `GOOGLE_DRIVE_OAUTH_CREDENTIALS` | Google Drive OAuth2凭证JSON（含access_token和refresh_token） |
+| `GOOGLE_DRIVE_FOLDER_ID` | Field files上传目标文件夹ID：`17Eexa-x7fOIB0gOu63SWUkZlNSr5oyk8` |
+| `GOOGLE_DRIVE_ROUTING_FOLDER_ID` | Routing files上传目标文件夹ID |
+
+### GitHub Actions Workflow
+
+- **文件**：`.github/workflows/weekly-plan-emit.yml`
+- **自动触发**：每周六 06:00 UTC（即周五晚 10:00 PM PST）
+- **手动触发**：GitHub Actions → Weekly Plan and Emit → Run workflow，填入 `date` 和 `is_week_1`
+
+---
+
+## Google Drive 配置
+
+| 文件夹 | 链接 | 存放内容 |
+|--------|------|---------|
+| Field files | https://drive.google.com/drive/u/2/folders/17Eexa-x7fOIB0gOu63SWUkZlNSr5oyk8 | 每周按日期子文件夹，含路线、地址等field files |
+| Routing files | 见 `GOOGLE_DRIVE_ROUTING_FOLDER_ID` secret | segment_analysis、segment_assignments等routing文件 |
+
+**上传方式**：OAuth2凭证（非service account），通过workflow中的 `--oauth-credentials` 参数传入。
+
+---
+
 ## 数据检查清单（每周）
 
 运行以下检查验证当周plan：
