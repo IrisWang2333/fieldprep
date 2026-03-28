@@ -1,0 +1,13 @@
+date,task,bundle_id,bundle_type,num_segments,num_potholes_in_preceding_week,segments_with_potholes
+2026-03-28,DH,1319,conditional,9,1,SS-002741-PV1
+2026-03-28,DH,1865,conditional,13,1,SS-012166-PV1
+2026-03-28,DH,5474,conditional,12,1,SS-007412-PV1
+2026-03-28,DH,5040,conditional,16,1,SS-004468-PV1
+2026-03-28,DH,1709,random,6,0,
+2026-03-28,DH,2393,random,7,0,
+2026-03-28,D2DS,6016,d2ds_conditional,6,0,
+2026-03-28,D2DS,5512,d2ds_conditional,6,0,
+2026-03-28,D2DS,3248,d2ds_conditional,6,0,
+2026-03-28,D2DS,5423,d2ds_conditional,8,0,
+2026-03-28,D2DS,5957,d2ds_random,9,1,SS-012709-PV1
+2026-03-28,D2DS,3049,d2ds_random,4,1,SS-019198-PV1
