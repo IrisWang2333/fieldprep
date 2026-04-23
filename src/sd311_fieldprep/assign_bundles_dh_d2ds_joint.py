@@ -1,8 +1,18 @@
 #!/usr/bin/env python3
 """
-Joint DH+D2DS Bundle Assignment Optimization
+Joint DH+D2DS Bundle Assignment Optimization (Two-Phase)
 
-Assigns DH and D2DS bundles together to minimize maximum travel distance.
+Assigns DH and D2DS bundles together using a two-phase optimization:
+
+Phase 1: Minimize maximum travel distance (minimax)
+  - Ensures no interviewer has excessively long travel
+  - Uses iterative swaps to reduce the longest distance
+
+Phase 2: Minimize total travel distance (while preserving max)
+  - Improves overall fairness and efficiency
+  - Only accepts swaps that don't increase the maximum distance
+  - Reduces total system-wide travel
+
 Distance = Home → DH centroid + DH centroid → D2DS centroid
 """
 
@@ -237,10 +247,100 @@ def assign_bundles_dh_d2ds_joint(
             if improved:
                 break
 
-    print(f"[Joint Assignment] Refinement completed after {iteration} iterations")
-    print(f"[Joint Assignment] Final max travel: {current_max:.2f} km")
+    print(f"[Joint Assignment] Phase 1 completed after {iteration} iterations")
+    print(f"[Joint Assignment] Phase 1 final max travel: {current_max:.2f} km")
 
-    print(f"[Joint Assignment] Final assignment:")
+    # ============================================================================
+    # Phase 2: Minimize total distance without increasing max
+    # ============================================================================
+    print(f"\n[Joint Assignment] Step 4: Phase 2 - Minimize total distance (preserving max)")
+
+    current_total = sum(travel_distances.values())
+    print(f"[Joint Assignment] Phase 1 total distance: {current_total:.2f} km")
+
+    phase2_improved = True
+    phase2_iteration = 0
+    phase2_max_iterations = max_refine_iterations  # Same limit as Phase 1
+
+    while phase2_improved and phase2_iteration < phase2_max_iterations:
+        phase2_improved = False
+        phase2_iteration += 1
+
+        # Try all pairs of interviewers
+        for i in range(len(interviewers)):
+            for j in range(i+1, len(interviewers)):
+                name1 = interviewers[i]['name']
+                name2 = interviewers[j]['name']
+
+                interviewer1 = interviewers[i]
+                interviewer2 = interviewers[j]
+
+                # Try both swap types
+                swap_types = [
+                    ('dh', 'dh'),      # Swap DH bundles
+                    ('d2ds', 'd2ds'),  # Swap D2DS bundles
+                ]
+
+                for type1, type2 in swap_types:
+                    # Save original state
+                    orig_bundle1 = assignments[name1][type1]
+                    orig_bundle2 = assignments[name2][type2]
+
+                    # Try swap
+                    assignments[name1][type1] = orig_bundle2
+                    assignments[name2][type2] = orig_bundle1
+
+                    # Calculate new distances
+                    new_dist1 = calculate_travel_distance(
+                        interviewer1['lat'], interviewer1['lon'],
+                        assignments[name1]['dh'], assignments[name1]['d2ds'],
+                        bundle_info
+                    )
+                    new_dist2 = calculate_travel_distance(
+                        interviewer2['lat'], interviewer2['lon'],
+                        assignments[name2]['dh'], assignments[name2]['d2ds'],
+                        bundle_info
+                    )
+
+                    # Calculate new max and total
+                    new_max = max(new_dist1, new_dist2,
+                                 *[travel_distances[n] for n in travel_distances if n not in [name1, name2]])
+                    new_total = new_dist1 + new_dist2 + sum(travel_distances[n] for n in travel_distances if n not in [name1, name2])
+
+                    # Accept swap if: max doesn't increase AND total decreases
+                    if new_max <= current_max and new_total < current_total:
+                        # Keep the swap
+                        old_total = current_total
+                        travel_distances[name1] = new_dist1
+                        travel_distances[name2] = new_dist2
+                        current_total = new_total
+                        phase2_improved = True
+
+                        max_change = "maintained" if new_max == current_max else f"reduced to {new_max:.2f}"
+                        print(f"  Phase 2 Iteration {phase2_iteration}: Swapped {type1} bundles {orig_bundle1} ↔ {orig_bundle2} ({name1} ↔ {name2})")
+                        print(f"    Total: {new_total:.2f} km (saved {(old_total - new_total):.2f} km), Max: {max_change}")
+
+                        # Update max if it decreased
+                        if new_max < current_max:
+                            current_max = new_max
+
+                        break  # Move to next pair after successful swap
+                    else:
+                        # Undo swap
+                        assignments[name1][type1] = orig_bundle1
+                        assignments[name2][type2] = orig_bundle2
+
+                if phase2_improved:
+                    break
+
+            if phase2_improved:
+                break
+
+    print(f"[Joint Assignment] Phase 2 completed after {phase2_iteration} iterations")
+    print(f"[Joint Assignment] Final max travel: {current_max:.2f} km")
+    print(f"[Joint Assignment] Final total travel: {current_total:.2f} km")
+
+    print(f"\n[Joint Assignment] Final assignment:")
     results = {}
     for name in sorted(travel_distances.keys()):
         dh_id = assignments[name]['dh']
