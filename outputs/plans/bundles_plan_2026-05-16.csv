@@ -1,0 +1,13 @@
+date,interviewer,task,bundle_id,bundle_type,list_code,sfh_bundle_total
+2026-05-16,A,D2DS,5420,d2ds_random,30,85
+2026-05-16,B,D2DS,897,d2ds_conditional,30,88
+2026-05-16,C,D2DS,3608,d2ds_conditional,30,82
+2026-05-16,D,D2DS,397,d2ds_random,30,87
+2026-05-16,E,D2DS,3444,d2ds_conditional,30,86
+2026-05-16,F,D2DS,5181,d2ds_conditional,30,80
+2026-05-16,A,DH,3516,conditional,30,85
+2026-05-16,B,DH,1463,conditional,30,84
+2026-05-16,C,DH,2357,random,30,80
+2026-05-16,D,DH,5797,random,30,81
+2026-05-16,E,DH,3588,conditional,30,87
+2026-05-16,F,DH,5330,conditional,30,82
