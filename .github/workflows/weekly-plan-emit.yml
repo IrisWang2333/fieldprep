@@ -168,7 +168,7 @@ jobs:
 
           plan_csv = run_plan(
               date=date,
-              interviewers=('A', 'B', 'D', 'E', 'F'),  # Temporary: Skip C (Rene) for 2026-06-06
+              interviewers=('A', 'B', 'C', 'D', 'E', 'F'),
               tasks=('DH', 'D2DS'),
               list_code=30,
               seed=42,
