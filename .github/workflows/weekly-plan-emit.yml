@@ -66,6 +66,14 @@ jobs:
             TARGET_DATE=$(python -c "from datetime import datetime, timedelta; today = datetime.now(); this_saturday = today if today.weekday() == 5 else (today + timedelta(days=1) if today.weekday() == 4 else today + timedelta(days=(5 - today.weekday()) % 7 or 7)); print(this_saturday.strftime('%Y-%m-%d'))")
             echo "Auto-calculated date: $TARGET_DATE"
           fi
+
+          # TEMPORARY: Skip 2026-06-06 (already ran manually)
+          if [ "$TARGET_DATE" = "2026-06-06" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "⏭️  Skipping scheduled run for $TARGET_DATE (already completed manually)"
+            echo "This is a temporary skip - remove this check after 2026-06-06"
+            exit 0
+          fi
+
           echo "next_saturday=$TARGET_DATE" >> $GITHUB_OUTPUT
           echo "Target date: $TARGET_DATE"
 
