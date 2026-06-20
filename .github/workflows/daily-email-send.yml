@@ -2,13 +2,15 @@ name: Daily Assignment Emails
 
 on:
   schedule:
-    # Run every Saturday at 5:30 AM Pacific Time
+    # Run every Saturday at 3:30 AM Pacific Time (nominal)
     # Note: GitHub Actions uses UTC time
     # Saturday = 6 in cron (0=Sunday, 6=Saturday)
-    # Jan-Feb (PST): 5:30 AM PST = 13:30 UTC
-    # Mar-Nov (PDT): 5:30 AM PDT = 12:30 UTC
-    # Using 12:30 UTC for summer (DST period)
-    - cron: '30 12 * * 6'
+    # Set early on purpose: GitHub Actions schedule triggers are delayed
+    # ~1-1.7h under load, so 3:30 AM nominal lands emails around ~5 AM.
+    # Jan-Feb (PST): 3:30 AM PST = 11:30 UTC
+    # Mar-Nov (PDT): 3:30 AM PDT = 10:30 UTC
+    # Using 10:30 UTC for summer (DST period)
+    - cron: '30 10 * * 6'
 
   workflow_dispatch:
     # Allow manual triggering for testing
