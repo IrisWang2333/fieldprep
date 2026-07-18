@@ -16,12 +16,19 @@ Phase 2: Minimize total travel distance (while preserving max)
 Distance = Home → DH centroid + DH centroid → D2DS centroid
 """
 
+import itertools
 import geopandas as gpd
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Tuple
 from math import radians, sin, cos, sqrt, atan2
+
+
+# Interviewer pairs who carpool (one drives the other) and must therefore start
+# the day from geographically adjacent locations. Names must match the roster /
+# Interviewers sheet exactly (case-sensitive).
+CARPOOL_PAIRS: List[Tuple[str, str]] = [("Vicky", "Veronica")]
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -67,6 +74,137 @@ def calculate_travel_distance(
     dist_dh_to_d2ds = haversine_distance(dh_lat, dh_lon, d2ds_lat, d2ds_lon)
 
     return dist_home_to_dh + dist_dh_to_d2ds
+
+
+def _build_bundle_info(bundle_ids, bundles_gdf: gpd.GeoDataFrame) -> Dict:
+    """Build {bundle_id: {'lat', 'lon'}} centroids for the given bundle IDs."""
+    info = {}
+    for bundle_id in bundle_ids:
+        bundle_df = bundles_gdf[bundles_gdf['bundle_id'] == bundle_id]
+        if len(bundle_df) == 0:
+            print(f"Warning: Bundle {bundle_id} not found when building centroids")
+            continue
+        lat, lon = get_bundle_centroid(bundle_df)
+        info[bundle_id] = {'lat': lat, 'lon': lon}
+    return info
+
+
+def _apply_carpool_constraint(
+    result: Dict[str, Tuple[int, int, float]],
+    interviewers: List[Dict],
+    dh_bundles: List[int],
+    d2ds_bundles: List[int],
+    bundles_gdf: gpd.GeoDataFrame,
+    carpool_pairs: List[Tuple[str, str]] = None,
+) -> Dict[str, Tuple[int, int, float]]:
+    """
+    Re-label the normally-optimized (DH, D2DS) assignments so that a carpool pair
+    (one interviewer drives the other) receives the two assignments that minimize
+    the average of their DH-to-DH and D2DS-to-D2DS starting-point distances.
+
+    The pair share transportation for the whole day (DH first, then D2DS), so both
+    the DH and the D2DS start points should be close. For each candidate pair of
+    assignments we take avg(dist(DH_a, DH_b), dist(D2DS_a, D2DS_b)) and pick the
+    minimum. The DH-D2DS groupings produced by the normal optimization are preserved
+    as fixed units; only which interviewer holds which unit changes. Within the two
+    carpool units the orientation is chosen to minimize the pair's own home travel,
+    and the other interviewers are re-assigned the remaining units minimizing
+    (max, then total) home travel.
+
+    This is a pure re-labeling of already-drawn bundles: the set of DH/D2DS bundles
+    and their conditional/random treatment status is unchanged, so it does not
+    affect the experiment's treatment composition.
+    """
+    carpool_pairs = CARPOOL_PAIRS if carpool_pairs is None else carpool_pairs
+    names_present = {iv['name'] for iv in interviewers}
+    active = [p for p in carpool_pairs if p[0] in names_present and p[1] in names_present]
+
+    if not active:
+        return result
+
+    pair = active[0]
+    if len(active) > 1:
+        print(f"[Carpool] Multiple carpool pairs present; applying only {pair}, ignoring {active[1:]}")
+    c1, c2 = pair
+    print(f"\n[Carpool] Applying DH-proximity constraint for carpool pair {c1} & {c2}")
+
+    home = {iv['name']: (iv['lat'], iv['lon']) for iv in interviewers}
+    bundle_info = _build_bundle_info(set(dh_bundles) | set(d2ds_bundles), bundles_gdf)
+
+    # Fixed (DH, D2DS) units from the normal optimization
+    names = list(result.keys())
+    unit_list = [(result[name][0], result[name][1]) for name in names]  # (dh, d2ds)
+
+    # Find the two units minimizing the average of the pair's DH-to-DH and
+    # D2DS-to-D2DS starting-point distances.
+    best = None
+    for i in range(len(unit_list)):
+        for j in range(i + 1, len(unit_list)):
+            dh_i, dh_j = unit_list[i][0], unit_list[j][0]
+            d2_i, d2_j = unit_list[i][1], unit_list[j][1]
+            if any(b not in bundle_info for b in (dh_i, dh_j, d2_i, d2_j)):
+                continue
+            dh_d = haversine_distance(
+                bundle_info[dh_i]['lat'], bundle_info[dh_i]['lon'],
+                bundle_info[dh_j]['lat'], bundle_info[dh_j]['lon'],
+            )
+            d2_d = haversine_distance(
+                bundle_info[d2_i]['lat'], bundle_info[d2_i]['lon'],
+                bundle_info[d2_j]['lat'], bundle_info[d2_j]['lon'],
+            )
+            avg_d = (dh_d + d2_d) / 2
+            if best is None or avg_d < best[0]:
+                best = (avg_d, i, j, dh_d, d2_d)
+
+    if best is None:
+        print("[Carpool] Could not compute starting-point distances; leaving assignment unchanged")
+        return result
+
+    avg_dist, i, j, dh_dist, d2_dist = best
+    carpool_units = [unit_list[i], unit_list[j]]
+    remaining_units = [u for k, u in enumerate(unit_list) if k not in (i, j)]
+    other_names = [name for name in names if name not in (c1, c2)]
+
+    print(f"[Carpool] Min avg(DH, D2DS) pair -> {c1} & {c2}: "
+          f"DH {carpool_units[0][0]}&{carpool_units[1][0]} ({dh_dist:.2f} km), "
+          f"D2DS {carpool_units[0][1]}&{carpool_units[1][1]} ({d2_dist:.2f} km), "
+          f"avg {avg_dist:.2f} km")
+
+    def travel(name, unit):
+        h = home[name]
+        return calculate_travel_distance(h[0], h[1], unit[0], unit[1], bundle_info)
+
+    # Orient the two carpool units between c1 and c2 to minimize their home travel
+    if (travel(c1, carpool_units[0]) + travel(c2, carpool_units[1]) <=
+            travel(c1, carpool_units[1]) + travel(c2, carpool_units[0])):
+        c1_unit, c2_unit = carpool_units[0], carpool_units[1]
+    else:
+        c1_unit, c2_unit = carpool_units[1], carpool_units[0]
+
+    # Assign remaining units to the other interviewers, minimizing (max, then total)
+    best_perm = None
+    for perm in itertools.permutations(remaining_units):
+        dists = [travel(other_names[k], perm[k]) for k in range(len(other_names))]
+        key = (max(dists) if dists else 0.0, sum(dists))
+        if best_perm is None or key < best_perm[0]:
+            best_perm = (key, perm, dists)
+
+    final = {
+        c1: (c1_unit[0], c1_unit[1], travel(c1, c1_unit)),
+        c2: (c2_unit[0], c2_unit[1], travel(c2, c2_unit)),
+    }
+    if other_names:
+        _, perm, dists = best_perm
+        for k, name in enumerate(other_names):
+            final[name] = (perm[k][0], perm[k][1], dists[k])
+
+    print(f"[Carpool] Final assignment after carpool constraint:")
+    for name in sorted(final.keys()):
+        dh_id, d2ds_id, dist = final[name]
+        tag = " <carpool>" if name in (c1, c2) else ""
+        print(f"  {name}: DH={dh_id}, D2DS={d2ds_id}, dist={dist:.2f} km{tag}")
+
+    return final
 
 
 def assign_bundles_dh_d2ds_joint(
@@ -358,9 +496,16 @@ def assign_bundles_for_date_dh_d2ds_joint(
     d2ds_bundles: List[int],
     bundles_gdf: gpd.GeoDataFrame,
     max_refine_iterations: int = 100,
-    sheet_id: str = '1IFb5AF2VEd9iMK69B4GFlYovVOM-7_TxIo6MrsJ-6X0'
+    sheet_id: str = '1IFb5AF2VEd9iMK69B4GFlYovVOM-7_TxIo6MrsJ-6X0',
+    carpool_pairs: List[Tuple[str, str]] = None,
 ) -> Dict[str, Tuple[int, int, float]]:
-    """Wrapper function for joint DH+D2DS assignment."""
+    """Wrapper function for joint DH+D2DS assignment.
+
+    After the normal travel optimization, any configured carpool pair (see
+    CARPOOL_PAIRS) that is present on this date is re-assigned the two DH
+    starting points closest to each other, so the driver and passenger begin
+    the day in the same area.
+    """
     from sd311_fieldprep.interviewer_geocoding import get_interviewers_for_date_with_locations
 
     interviewers = get_interviewers_for_date_with_locations(
@@ -370,10 +515,21 @@ def assign_bundles_for_date_dh_d2ds_joint(
 
     print(f"[Joint Assignment] Loaded {len(interviewers)} interviewers for {date}")
 
-    return assign_bundles_dh_d2ds_joint(
+    result = assign_bundles_dh_d2ds_joint(
         interviewers=interviewers,
         dh_bundles=dh_bundles,
         d2ds_bundles=d2ds_bundles,
         bundles_gdf=bundles_gdf,
         max_refine_iterations=max_refine_iterations
     )
+
+    result = _apply_carpool_constraint(
+        result=result,
+        interviewers=interviewers,
+        dh_bundles=dh_bundles,
+        d2ds_bundles=d2ds_bundles,
+        bundles_gdf=bundles_gdf,
+        carpool_pairs=carpool_pairs,
+    )
+
+    return result
