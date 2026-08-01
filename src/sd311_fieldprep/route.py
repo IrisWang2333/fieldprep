@@ -42,6 +42,30 @@ def _snap_xy(pt, tol=0.5):
     """Snap a (x,y) tuple to a grid of size `tol` meters to fuse near-identical endpoints."""
     return (round(pt[0] / tol) * tol, round(pt[1] / tol) * tol)
 
+
+def is_route_connected(b_segs: gpd.GeoDataFrame, snap_tol: float = 0.5) -> bool:
+    """
+    True iff the bundle's segments form a single connected component under the
+    SAME endpoint graph the route builder uses (see build_walk_order).
+
+    Call this at sampling time (plan.py) so bundles the router cannot route are
+    never drawn. It must use the identical primitives (_line_endpoints_xy,
+    _snap_xy, MultiGraph, 0.5 m snap, EPSG:26911) as build_walk_order, otherwise
+    the two can disagree and an unroutable bundle slips through.
+    """
+    g = b_segs
+    if g.crs is None or g.crs.to_epsg() != 26911:
+        g = g.to_crs(26911)
+
+    G = nx.MultiGraph()
+    for row in g.itertuples():
+        a, b = _line_endpoints_xy(row.geometry)
+        if a is None or b is None:
+            continue
+        G.add_edge(_snap_xy(a, snap_tol), _snap_xy(b, snap_tol))
+
+    return G.number_of_edges() > 0 and nx.number_connected_components(G) == 1
+
 def _pair_odds_min_weight(G):
     """
     Return pairs for odd-degree nodes using min-weight matching.

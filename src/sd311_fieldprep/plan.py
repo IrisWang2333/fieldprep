@@ -20,6 +20,7 @@ from sd311_fieldprep.utils import (
     addressable_mask,
 )
 from sd311_fieldprep.emit import _compose_address
+from sd311_fieldprep.route import is_route_connected
 
 # Import new data fetching and sampling utilities
 from utils.data_fetcher import (
@@ -50,67 +51,10 @@ from sd311_fieldprep.assign_bundles_minimax import (
 )
 
 
-def _endpoints_xy(geom):
-    # robust to LineString / MultiLineString
-    try:
-        coords = np.asarray(geom.coords)
-    except Exception:
-        from shapely.ops import linemerge
-        m = linemerge(geom)
-        try:
-            coords = np.asarray(m.coords)
-        except Exception:
-            return None, None
-    if len(coords) < 2:
-        return None, None
-    a = (float(coords[0][0]), float(coords[0][1]))
-    b = (float(coords[-1][0]), float(coords[-1][1]))
-    return a, b
-
-
-def _route_connected_by_streets(streets_m, seg_id_col, bundle_seg_ids, snap_tol=0.5):
-    """
-    True iff all street segments in bundle_seg_ids form a single connected component
-    when nodes are segment endpoints (snapped by snap_tol meters), using streets_m.
-    Mirrors route.py's graph construction.
-    """
-    sub = streets_m.loc[streets_m[seg_id_col].isin(bundle_seg_ids)]
-    if sub.empty:
-        return False
-
-    def snap(pt):
-        return (round(pt[0] / snap_tol) * snap_tol, round(pt[1] / snap_tol) * snap_tol)
-
-    G = nx.Graph()
-    for geom in sub.geometry:
-        a, b = _endpoints_xy(geom)
-        if a is None or b is None:
-            continue
-        G.add_edge(snap(a), snap(b))
-
-    return G.number_of_edges() > 0 and nx.number_connected_components(G) == 1
-
-
-def _route_style_connected(segments_gdf, bundle_id, snap_tol=0.5):
-    """
-    True iff all segments in this bundle form a single connected component
-    when nodes are segment endpoints (snapped by snap_tol meters).
-    Mirrors route.py’s graph.
-    """
-    sub = segments_gdf.loc[segments_gdf["bundle_id"] == bundle_id]
-    if sub.empty:
-        return False
-
-    def snap(pt):
-        return (round(pt[0] / snap_tol) * snap_tol, round(pt[1] / snap_tol) * snap_tol)
-
-    G = nx.Graph()
-    for geom in sub.geometry:
-        a, b = _endpoints_xy(geom)
-        if a is None or b is None:
-            continue
-        G.add_edge(snap(a), snap(b))
-    return G.number_of_edges() > 0 and nx.number_connected_components(G) == 1
+# Connectivity is verified with route.is_route_connected (the router's own
+# endpoint graph) so plan.py and route.py can never disagree — see
+# _prepare_bundle_candidates. The previous streets-network-based check could
+# pass bundles the router then rejected (e.g. 3058's mid-segment T-junction).
 
 
 # Fallback candidates if filters.cpd.name_field isn't set in params.yaml
@@ -172,12 +116,11 @@ def _load_bundles(session: str, bundle_file: str | None = None) -> gpd.GeoDataFr
     return g
 
 
-# Bundles that must never be drawn because emit.py's route builder cannot route
-# them (it needs a single connected bundle). Known offenders: bundles whose
-# segments join only at a mid-segment T-junction, which the endpoint-based route
-# graph treats as disconnected (e.g. 3058: 2 alley segments meeting Greyling Dr
-# mid-block, graph splits into 11+3 nodes). Verified 2026-08-01.
-EXCLUDED_BUNDLES: set[int] = {3058}
+# Manual override to force-exclude specific bundles from sampling, for any
+# reason. Unroutable bundles (like 3058) are now caught automatically by the
+# route.is_route_connected check in _prepare_bundle_candidates, so this is only
+# needed for one-off exclusions not covered by that check. Normally empty.
+EXCLUDED_BUNDLES: set[int] = set()
 
 
 def run_plan(
@@ -398,12 +341,21 @@ def run_plan(
         mask = u["_seg_ids"].apply(_is_disjoint).to_numpy()
         u = u.loc[mask].copy()
 
-        # Router-style connectivity check
-        connected_mask = u["_seg_ids"].apply(
-            lambda seglist: _route_connected_by_streets(streets_m, seg_id, set(seglist), snap_tol=0.5)
-            if isinstance(seglist, (list, tuple, set)) and len(seglist) > 0
-            else False
+        # Router-style connectivity check — run the router's OWN endpoint graph
+        # (route.is_route_connected) on the bundle's own segment geometry, i.e.
+        # the exact geometry emit.py routes. Checking against the full street
+        # network instead let unroutable bundles through when segments met at a
+        # mid-segment T-junction (e.g. 3058: graph split into 11+3 nodes).
+        cand_ids = set(u["bundle_id"])
+        g_route_m = project_to(
+            g.loc[g["bundle_id"].isin(cand_ids), ["bundle_id", "geometry"]], work_epsg
         )
+        connected_ids = {
+            bid
+            for bid, sub in g_route_m.groupby("bundle_id")
+            if is_route_connected(sub, snap_tol=0.5)
+        }
+        connected_mask = u["bundle_id"].isin(connected_ids)
         dropped = int((~connected_mask).sum())
         if dropped:
             print(f"  Skipped {dropped} non-route-connected bundle(s)")
