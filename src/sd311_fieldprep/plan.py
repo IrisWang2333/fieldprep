@@ -172,6 +172,14 @@ def _load_bundles(session: str, bundle_file: str | None = None) -> gpd.GeoDataFr
     return g
 
 
+# Bundles that must never be drawn because emit.py's route builder cannot route
+# them (it needs a single connected bundle). Known offenders: bundles whose
+# segments join only at a mid-segment T-junction, which the endpoint-based route
+# graph treats as disconnected (e.g. 3058: 2 alley segments meeting Greyling Dr
+# mid-block, graph splits into 11+3 nodes). Verified 2026-08-01.
+EXCLUDED_BUNDLES: set[int] = {3058}
+
+
 def run_plan(
     date: str,
     interviewers: list[str] | tuple[str, ...] = ("A", "B", "C", "D"),
@@ -407,6 +415,16 @@ def run_plan(
     # Prepare candidate pools
     print(f"\n[Filter Application] Applying filters (CPD, SFH, connectivity)...")
     all_candidates = _prepare_bundle_candidates(g_dh, cpd, sfh_min, sfh_max)
+
+    # Drop known-unroutable bundles so they are never sampled (see EXCLUDED_BUNDLES).
+    if EXCLUDED_BUNDLES:
+        n_before = len(all_candidates)
+        all_candidates = all_candidates[
+            ~all_candidates["bundle_id"].isin(EXCLUDED_BUNDLES)
+        ].copy()
+        n_removed = n_before - len(all_candidates)
+        if n_removed:
+            print(f"  Excluded {n_removed} known-unroutable bundle(s): {sorted(EXCLUDED_BUNDLES)}")
 
     # Split into eligible and non-eligible
     eligible_candidates = all_candidates[all_candidates["bundle_id"].isin(eligible_bundle_ids)].copy()
