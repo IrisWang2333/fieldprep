@@ -28,7 +28,12 @@ from math import radians, sin, cos, sqrt, atan2
 # Interviewer pairs who carpool (one drives the other) and must therefore start
 # the day from geographically adjacent locations. Names must match the roster /
 # Interviewers sheet exactly (case-sensitive).
-CARPOOL_PAIRS: List[Tuple[str, str]] = [("Vicky", "Veronica")]
+#
+# DISABLED 2026-08-07 per request: the carpool packing pulled the pair (and,
+# by taking near-home bundles, other interviewers too) far from their homes on
+# spread-out draws, so we reverted to normal 6-person assignment. To re-enable,
+# add the pair back, e.g. [("Vicky", "Veronica")].
+CARPOOL_PAIRS: List[Tuple[str, str]] = []
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
