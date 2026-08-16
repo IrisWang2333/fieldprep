@@ -18,7 +18,7 @@
 | Pilot | 2025-12-27 | Week 1：24 DH bundles，无D2DS |
 | Official Week 1 | 2026-01-10 | 24 DH bundles，无D2DS |
 | Official Week 2+ | 2026-01-17 起 | 6 DH + 6 D2DS per week |
-| 实验结束 | 2026-08-15 | |
+| 实验结束 | 2026-08-23 | |
 | 排除日期 | 2026-05-23, 2026-07-04 | 假期/休息 |
 
 ---
