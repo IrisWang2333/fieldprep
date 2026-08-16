@@ -67,7 +67,7 @@ jobs:
           fi
 
           START_DATE="2026-01-10"
-          END_DATE="2026-08-08"
+          END_DATE="2026-08-23"
 
           if [[ "$TODAY" < "$START_DATE" ]] || [[ "$TODAY" > "$END_DATE" ]]; then
             echo "skip=true" >> $GITHUB_OUTPUT

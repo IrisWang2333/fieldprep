@@ -118,7 +118,7 @@ jobs:
           EXCLUDED_DATES=("2026-05-23" "2026-07-04")
 
           # Define experiment end date
-          END_DATE="2026-08-15"
+          END_DATE="2026-08-23"
 
           # Check if date is excluded
           for excluded in "${EXCLUDED_DATES[@]}"; do
