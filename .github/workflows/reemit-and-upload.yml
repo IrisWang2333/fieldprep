@@ -1,0 +1,90 @@
+name: Re-emit and Upload (no re-draw)
+
+# Manual utility: regenerate the daily field files (starts.csv, routes.csv,
+# segments.geojson, ...) from the ALREADY-COMMITTED plan for a date, and
+# re-upload them to Google Drive — WITHOUT re-running plan.py (no re-sampling).
+# Use after hand-editing outputs/plans/bundles_plan_<date>.csv (e.g. removing
+# absent interviewers) so Drive reflects the edit but assignments stay fixed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Date to re-emit (YYYY-MM-DD). Uses the committed plan for this date.'
+        required: true
+        type: string
+
+jobs:
+  reemit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run emit.py from committed plan
+        run: |
+          DATE="${{ inputs.date }}"
+          PLAN_CSV="outputs/plans/bundles_plan_$DATE.csv"
+
+          if [ ! -f "$PLAN_CSV" ]; then
+            echo "❌ Plan not found: $PLAN_CSV"
+            exit 1
+          fi
+          echo "Re-emitting $DATE from $PLAN_CSV (no re-draw)..."
+
+          python -c "
+          import sys
+          sys.path.insert(0, 'src')
+          from sd311_fieldprep.emit import run_emit
+          run_emit(
+              date='$DATE',
+              plan_csv='$PLAN_CSV',
+              bundle_file='outputs/bundles/DH/bundles_multibfs_regroup_filtered_length_3.parquet',
+              addr_assignment_file='outputs/sweep/locked/segment_addresses_b40_m2.parquet'
+          )
+          print('Emit completed!')
+          "
+
+      - name: Upload daily files to Google Drive
+        env:
+          GOOGLE_DRIVE_OAUTH_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_OAUTH_CREDENTIALS }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: |
+          DATE="${{ inputs.date }}"
+          UPLOAD_DIR="outputs/incoming/daily/$DATE"
+          echo "Uploading $UPLOAD_DIR to Google Drive (overwrites same-named files)..."
+          python scripts/upload_to_drive.py \
+            "$UPLOAD_DIR" \
+            "$GOOGLE_DRIVE_FOLDER_ID" \
+            --oauth-credentials "$GOOGLE_DRIVE_OAUTH_CREDENTIALS"
+
+      - name: Upload routing files to Google Drive routing folder
+        env:
+          GOOGLE_DRIVE_OAUTH_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_OAUTH_CREDENTIALS }}
+          GOOGLE_DRIVE_ROUTING_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_ROUTING_FOLDER_ID }}
+        run: |
+          DATE="${{ inputs.date }}"
+          ROUTING_DIR="outputs/routing/segment_analysis/$DATE"
+          SEGMENT_CSV="outputs/plans/segment_assignments_$DATE.csv"
+
+          if [ -f "$SEGMENT_CSV" ]; then
+            cp "$SEGMENT_CSV" "$ROUTING_DIR/"
+            echo "✓ Copied segment_assignments to routing folder"
+          fi
+
+          echo "Uploading routing files to Google Drive..."
+          python scripts/upload_to_drive.py \
+            "$ROUTING_DIR" \
+            "$GOOGLE_DRIVE_ROUTING_FOLDER_ID" \
+            --oauth-credentials "$GOOGLE_DRIVE_OAUTH_CREDENTIALS"
